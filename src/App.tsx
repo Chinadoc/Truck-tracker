@@ -554,92 +554,82 @@ function App() {
               ) : null;
             })()}
 
-            {/* ★ Loads-to-Goal Calculator — Top of Dashboard */}
+            {/* ★ Monthly Break-Even — Miles-based */}
             {(() => {
-              // Use the same True Net Profit the dashboard shows
-              const trueNetProfit = analysis.ownerOperatorTrueProfit; // revenue - fuel - deadhead - depreciation - maint
+              // Per-mile economics
+              const ratePerMile = totalMiles > 0 ? totalIncome / totalMiles : 2.0;
+              const fuelPerMile = totalMiles > 0 ? completedExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / totalMiles : REGIONAL_DIESEL['AVG'].price / MPG;
+              const variableCostPerMile = fuelPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+              const marginalProfitPerMile = ratePerMile - variableCostPerMile;
 
-              // What you need to take home
-              const monthlyPersonal = totalPersonalMonthly;
+              // Fixed costs this month
+              const fixedCosts = completedExpenses.filter(e => ['Insurance', 'Registration', 'Tolls', 'Dispatch', 'Lock Box', 'Trailer', 'Food'].includes(e.category)).reduce((s, e) => s + e.amount, 0);
+
+              // Revenue after variable costs covers fixed costs first, then personal/debt
+              const grossMargin = totalIncome - (totalMiles * variableCostPerMile);
+              const afterFixed = grossMargin - fixedCosts;
+
+              // Personal + debt obligations
+              const personalNeed = totalPersonalMonthly;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
-              const takeHomeNeed = monthlyPersonal + debtPayment;
-
-              // How much of take-home is covered?
-              const takeHomeCovered = Math.max(0, trueNetProfit);
-              const shortfall = Math.max(0, takeHomeNeed - takeHomeCovered);
-              const pctCovered = takeHomeNeed > 0 ? Math.min(100, (takeHomeCovered / takeHomeNeed) * 100) : 100;
-              const goalMet = takeHomeCovered >= takeHomeNeed;
-
-              // Loads needed to close the gap
-              const avgTripNet = completedIncomes.length > 0 ? trueNetProfit / completedIncomes.length : 500;
-              const loadsLeft = shortfall > 0 && avgTripNet > 0 ? Math.ceil(shortfall / Math.max(avgTripNet, 200)) : 0;
-              const daysLeft = loadsLeft * 2;
-
-              const layers = [
-                { label: 'Personal', need: monthlyPersonal, color: '#eab308', icon: '🏠' },
-                { label: 'Debt', need: debtPayment, color: '#a855f7', icon: '💳' },
-              ];
-              let runningNet = takeHomeCovered;
+              const takeHomeNeed = personalNeed + debtPayment;
+              const shortfall = Math.max(0, takeHomeNeed - Math.max(0, afterFixed));
+              const milesNeeded = marginalProfitPerMile > 0 ? Math.ceil(shortfall / marginalProfitPerMile) : 0;
+              const pctCovered = takeHomeNeed > 0 ? Math.min(100, (Math.max(0, afterFixed) / takeHomeNeed) * 100) : 100;
+              const goalMet = afterFixed >= takeHomeNeed;
+              const fixedCovered = grossMargin >= fixedCosts;
 
               return (
                 <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    {goalMet ? '✅' : '📊'} Monthly Break-Even
-                  </h3>
-                  <div className="text-secondary" style={{ fontSize: '0.6rem', marginBottom: '0.6rem' }}>
-                    Net Profit: <strong style={{ color: trueNetProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit)}</strong> — Need {formatCurrency(takeHomeNeed)} for personal + debt
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>📊 Monthly Break-Even</h3>
+
+                  {/* Per-mile economics strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginBottom: '0.75rem', fontSize: '0.65rem' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem', textTransform: 'uppercase', fontWeight: 700 }}>Rate</div>
+                      <div style={{ fontWeight: 800, color: 'var(--success)' }}>${ratePerMile.toFixed(2)}/mi</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem', textTransform: 'uppercase', fontWeight: 700 }}>Variable</div>
+                      <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${variableCostPerMile.toFixed(2)}/mi</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem', textTransform: 'uppercase', fontWeight: 700 }}>Marginal</div>
+                      <div style={{ fontWeight: 800, color: '#10b981' }}>${marginalProfitPerMile.toFixed(2)}/mi</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem', textTransform: 'uppercase', fontWeight: 700 }}>Fixed Costs</div>
+                      <div style={{ fontWeight: 800, color: fixedCovered ? 'var(--success)' : '#eab308' }}>{fixedCovered ? '✓ Covered' : formatCurrency(fixedCosts - grossMargin)}</div>
+                    </div>
                   </div>
 
-                  {/* Progress bar — personal + debt */}
-                  <div style={{ display: 'flex', height: '22px', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.6rem', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.3)' }}>
-                    {layers.map((l, i) => {
-                      const covered = Math.min(runningNet, l.need);
-                      runningNet -= Math.max(0, covered);
-                      const pct = takeHomeNeed > 0 ? (covered / takeHomeNeed) * 100 : 0;
-                      return pct > 0 ? (
-                        <div key={i} title={`${l.label}: ${formatCurrency(covered)} / ${formatCurrency(l.need)}`}
-                          style={{ width: `${pct}%`, background: l.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', fontWeight: 700, color: '#fff', transition: 'width 1s ease' }}>
-                          {pct > 10 ? l.icon : ''}
-                        </div>
-                      ) : null;
-                    })}
-                    {shortfall > 0 && <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', color: 'var(--text-secondary)' }}>{formatCurrency(shortfall)} short</div>}
+                  {/* Progress toward personal + debt */}
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', marginBottom: '0.2rem' }}>
+                      <span className="text-secondary">Take-home: {formatCurrency(Math.max(0, afterFixed))} of {formatCurrency(takeHomeNeed)}</span>
+                      <span style={{ fontWeight: 700, color: goalMet ? 'var(--success)' : 'var(--danger)' }}>{pctCovered.toFixed(0)}%</span>
+                    </div>
+                    <div style={{ height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pctCovered}%`, height: '100%', background: goalMet ? 'var(--success)' : pctCovered > 50 ? '#eab308' : 'var(--danger)', borderRadius: '4px', transition: 'width 1.5s ease-out' }} />
+                    </div>
                   </div>
 
-                  {/* Mini buckets */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', marginBottom: '0.6rem', fontSize: '0.65rem' }}>
-                    {(() => {
-                      let r = takeHomeCovered; return layers.map((l, i) => {
-                        const covered = Math.min(r, l.need);
-                        r -= Math.max(0, covered);
-                        const done = covered >= l.need;
-                        return (
-                          <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.35rem 0.5rem', borderLeft: `3px solid ${l.color}` }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span>{l.icon} {l.label}</span>
-                              <span style={{ fontWeight: 700, color: done ? 'var(--success)' : l.color, fontSize: '0.6rem' }}>{done ? '✓' : `${formatCurrency(l.need - covered)} short`}</span>
-                            </div>
-                            <div style={{ fontSize: '0.5rem', color: 'var(--text-secondary)' }}>{formatCurrency(l.need)}/mo needed</div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-
-                  {/* Bottom line */}
+                  {/* Bottom line — miles or surplus */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: goalMet ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)', borderRadius: '8px', border: `1px solid ${goalMet ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '0.85rem', color: goalMet ? 'var(--success)' : 'var(--text-primary)' }}>
-                        {goalMet ? `${formatCurrency(takeHomeCovered - takeHomeNeed)} surplus` : `${loadsLeft} more load${loadsLeft !== 1 ? 's' : ''} needed`}
+                        {goalMet ? `${formatCurrency(afterFixed - takeHomeNeed)} surplus` : `${milesNeeded.toLocaleString()} more miles needed`}
                       </div>
                       <div className="text-secondary" style={{ fontSize: '0.55rem' }}>
-                        {goalMet ? `Take-home covers all ${formatCurrency(takeHomeNeed)}` : `≈ ${daysLeft} days · ${formatCurrency(shortfall)} shortfall`}
+                        {goalMet
+                          ? 'Fixed costs covered · Personal + debt fully funded'
+                          : `@ $${marginalProfitPerMile.toFixed(2)}/mi marginal · ${formatCurrency(shortfall)} shortfall`}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: goalMet ? 'var(--success)' : pctCovered > 50 ? '#eab308' : 'var(--danger)' }}>{pctCovered.toFixed(0)}%</div>
-                      <div className="text-secondary" style={{ fontSize: '0.5rem' }}>take-home</div>
-                    </div>
+                    {!goalMet && <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>≈ {Math.ceil(milesNeeded / Math.max(1, totalMiles / Math.max(1, completedIncomes.length)))} trips</div>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem' }}>@ {Math.round(totalMiles / Math.max(1, completedIncomes.length))} mi avg</div>
+                    </div>}
                   </div>
                 </div>
               );
