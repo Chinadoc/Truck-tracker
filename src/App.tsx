@@ -1,24 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  Truck, 
-  Wrench, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  Truck,
+  Wrench,
+  DollarSign,
+  TrendingUp,
   TrendingDown,
   Plus,
   Trash2,
   X
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  Legend, 
-  ResponsiveContainer 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -44,7 +44,7 @@ type Expense = {
 // Main App Component
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses'>('dashboard');
-  
+
   // State
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -61,7 +61,7 @@ function App() {
   // Chart Data Preparation (Grouping by Month - simple version)
   const chartData = useMemo(() => {
     const monthlyData: Record<string, { income: number, expense: number }> = {};
-    
+
     incomes.forEach(inc => {
       const month = inc.date.substring(0, 7); // YYYY-MM
       if (!monthlyData[month]) monthlyData[month] = { income: 0, expense: 0 };
@@ -86,7 +86,7 @@ function App() {
     const formData = new FormData(e.currentTarget);
     const distance = Number(formData.get('distance'));
     const totalPayout = Number(formData.get('totalPayout'));
-    
+
     const newIncome: Income = {
       id: uuidv4(),
       date: formData.get('date') as string,
@@ -118,7 +118,7 @@ function App() {
   const deleteExpense = (id: string) => setExpenses(expenses.filter(e => e.id !== id));
 
   // Render Helpers
-  const formatCurrency = (amount: number) => 
+  const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   return (
@@ -129,23 +129,23 @@ function App() {
           <Truck size={28} className="text-accent" />
           <span>Road Ledger</span>
         </div>
-        
+
         <nav className="nav-links mt-8">
-          <button 
+          <button
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
           </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'income' ? 'active' : ''}`}
             onClick={() => setActiveTab('income')}
           >
             <TrendingUp size={20} className={activeTab === 'income' ? 'text-accent' : 'text-success'} />
             <span>Income & Loads</span>
           </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
             onClick={() => setActiveTab('expenses')}
           >
@@ -195,10 +195,10 @@ function App() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                     <XAxis dataKey="name" stroke="var(--text-secondary)" />
                     <YAxis stroke="var(--text-secondary)" tickFormatter={(value) => `$${value}`} />
-                    <RechartsTooltip 
+                    <RechartsTooltip
                       contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px', color: 'white' }}
                       itemStyle={{ color: 'white' }}
-                      formatter={(value: number) => formatCurrency(value)}
+                      formatter={(value: any) => formatCurrency(Number(value))}
                     />
                     <Legend />
                     <Bar dataKey="Income" fill="var(--success)" radius={[4, 4, 0, 0]} />
