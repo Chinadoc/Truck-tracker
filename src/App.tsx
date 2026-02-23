@@ -1187,6 +1187,10 @@ function App() {
                                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#eab308', fontWeight: 700 }}>Maint Reserve</div>
                                       <div style={{ fontWeight: 700, marginTop: '0.25rem', color: '#eab308' }}>-{formatCurrency(tripMaint)}</div>
                                     </div>
+                                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(168,85,247,0.3)' }}>
+                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#a855f7', fontWeight: 700 }}>Dispatch 10%</div>
+                                      <div style={{ fontWeight: 700, marginTop: '0.25rem', color: '#a855f7' }}>-{formatCurrency(tripDispatch)}</div>
+                                    </div>
                                     <div style={{ background: analysis.isBeatingCompanyRate ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', padding: '0.75rem', borderRadius: '10px', border: `1px solid ${tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
                                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>True Trip Net</div>
                                       <div style={{ fontWeight: 800, marginTop: '0.25rem', fontSize: '1.1rem', color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(tripTrueNet)}</div>
