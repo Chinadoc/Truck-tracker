@@ -281,9 +281,23 @@ const buildExpenses = (): Expense[] => {
 const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
-// localStorage helpers
+// Data versioning — bump this to force-reset cached data when defaults change
+const DATA_VERSION = 3;
 const loadState = <T,>(key: string, fallback: T): T => {
-  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
+  try {
+    const savedVer = Number(localStorage.getItem('rl_version') || '0');
+    if (savedVer < DATA_VERSION) {
+      // Clear all cached data on version bump
+      localStorage.removeItem('rl_incomes');
+      localStorage.removeItem('rl_expenses');
+      localStorage.removeItem('rl_personal');
+      localStorage.removeItem('rl_debts');
+      localStorage.setItem('rl_version', String(DATA_VERSION));
+      return fallback;
+    }
+    const s = localStorage.getItem(key);
+    return s ? JSON.parse(s) : fallback;
+  } catch { return fallback; }
 };
 
 function App() {
