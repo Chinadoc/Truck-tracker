@@ -15,7 +15,9 @@ import {
   ChevronDown,
   ChevronUp,
   Upload,
-  Clock
+  Clock,
+  CalendarDays,
+  FileText
 } from 'lucide-react';
 import {
   BarChart,
@@ -231,7 +233,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'map'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'map' | 'calendar' | 'reports'>('dashboard');
   const [incomes, setIncomes] = useState<Income[]>(INITIAL_TRIPS);
   const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -411,6 +413,8 @@ function App() {
             { tab: 'dashboard' as const, icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
             { tab: 'income' as const, icon: <TrendingUp size={20} className={activeTab === 'income' ? 'text-accent' : 'text-success'} />, label: 'Income & Loads' },
             { tab: 'expenses' as const, icon: <TrendingDown size={20} className={activeTab === 'expenses' ? 'text-accent' : 'text-danger'} />, label: 'Expenses' },
+            { tab: 'calendar' as const, icon: <CalendarDays size={20} className={activeTab === 'calendar' ? 'text-accent' : 'text-secondary'} />, label: 'Calendar' },
+            { tab: 'reports' as const, icon: <FileText size={20} className={activeTab === 'reports' ? 'text-accent' : 'text-secondary'} />, label: 'Reports' },
             { tab: 'map' as const, icon: <MapPin size={20} className={activeTab === 'map' ? 'text-accent' : 'text-secondary'} />, label: 'Route Map' },
           ]).map(n => (
             <button key={n.tab} className={`nav-item ${activeTab === n.tab ? 'active' : ''}`} onClick={() => setActiveTab(n.tab)}>
@@ -805,6 +809,139 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* ====== CALENDAR ====== */}
+        {activeTab === 'calendar' && (() => {
+          const [calYear, calMonth] = [new Date().getFullYear(), new Date().getMonth()];
+          const firstDay = new Date(calYear, calMonth, 1).getDay();
+          const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+          const monthLabel = new Date(calYear, calMonth).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+          const days = Array.from({ length: 42 }, (_, i) => {
+            const dayNum = i - firstDay + 1;
+            return dayNum >= 1 && dayNum <= daysInMonth ? dayNum : null;
+          });
+          const tripsByDate = new Map<number, Income[]>();
+          incomes.forEach(inc => {
+            const d = new Date(inc.date);
+            if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
+              const day = d.getDate();
+              if (!tripsByDate.has(day)) tripsByDate.set(day, []);
+              tripsByDate.get(day)!.push(inc);
+            }
+          });
+          const expensesByDate = new Map<number, number>();
+          expenses.forEach(exp => {
+            const d = new Date(exp.date);
+            if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
+              const day = d.getDate();
+              expensesByDate.set(day, (expensesByDate.get(day) || 0) + exp.amount);
+            }
+          });
+          return (
+            <div className="animate-fade-in">
+              <header className="mb-6">
+                <h1 className="text-3xl font-bold">Calendar</h1>
+                <p className="text-secondary mt-1">{monthLabel} · {incomes.filter(i => { const d = new Date(i.date); return d.getFullYear() === calYear && d.getMonth() === calMonth; }).length} trips this month</p>
+              </header>
+              <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                    <div key={d} style={{ padding: '0.5rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{d}</div>
+                  ))}
+                  {days.map((day, i) => {
+                    const trips = day ? tripsByDate.get(day) : undefined;
+                    const expTotal = day ? expensesByDate.get(day) : undefined;
+                    return (
+                      <div key={i} style={{ minHeight: '80px', padding: '0.35rem', background: day ? 'rgba(0,0,0,0.15)' : 'transparent', borderRadius: '8px', border: day ? '1px solid rgba(255,255,255,0.04)' : 'none', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        {day && <div style={{ fontSize: '0.75rem', fontWeight: 600, color: trips ? 'var(--accent)' : 'var(--text-secondary)' }}>{day}</div>}
+                        {trips?.map(t => (
+                          <div key={t.id} style={{ fontSize: '0.55rem', background: 'rgba(59,130,246,0.15)', color: 'var(--accent)', padding: '0.15rem 0.3rem', borderRadius: '4px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={`${t.originCity} → ${t.destCity} | ${formatCurrency(t.totalPayout)}`}>
+                            {t.originCity?.split(',')[0]} → {t.destCity?.split(',')[0]}
+                          </div>
+                        ))}
+                        {expTotal && !trips ? <div style={{ fontSize: '0.55rem', color: 'var(--danger)', fontWeight: 600 }}>-{formatCurrency(expTotal)}</div> : null}
+                        {trips && <div style={{ fontSize: '0.5rem', color: 'var(--success)', fontWeight: 700 }}>{formatCurrency(trips.reduce((s, t) => s + t.totalPayout, 0))}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ====== REPORTS ====== */}
+        {activeTab === 'reports' && (() => {
+          const months = [...new Set([...incomes.map(i => i.date.substring(0, 7)), ...expenses.map(e => e.date.substring(0, 7))])].sort().reverse();
+          return (
+            <div className="animate-fade-in">
+              <header className="mb-6">
+                <h1 className="text-3xl font-bold">Profit & Loss Reports</h1>
+                <p className="text-secondary mt-1">Monthly breakdown with 1099 tax estimates</p>
+              </header>
+
+              {/* Summary Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="glass-panel stat-card"><div className="stat-title"><TrendingUp size={16} /> Revenue YTD</div><div className="stat-value text-success" style={{ fontSize: '1.8rem' }}>{formatCurrency(totalIncome)}</div></div>
+                <div className="glass-panel stat-card"><div className="stat-title"><TrendingDown size={16} /> Expenses YTD</div><div className="stat-value text-danger" style={{ fontSize: '1.8rem' }}>{formatCurrency(totalExpenses + analysis.totalHiddenCosts)}</div></div>
+                <div className="glass-panel stat-card"><div className="stat-title"><Calculator size={16} /> Tax Liability</div><div className="stat-value text-danger" style={{ fontSize: '1.8rem' }}>{formatCurrency(analysis.estimatedTax)}</div></div>
+                <div className="glass-panel stat-card"><div className="stat-title"><DollarSign size={16} /> Take-Home</div><div className="stat-value" style={{ fontSize: '1.8rem', color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.afterTaxProfit)}</div></div>
+              </div>
+
+              {/* Monthly P&L Table */}
+              <div className="glass-panel p-0 overflow-hidden">
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr><th>Month</th><th>Trips</th><th>Miles</th><th>Revenue</th><th>Fuel</th><th>Other Exp</th><th>Depr + Maint</th><th>Tax Est</th><th>Net</th></tr>
+                    </thead>
+                    <tbody>
+                      {months.map(month => {
+                        const mInc = incomes.filter(i => i.date.startsWith(month));
+                        const mExp = expenses.filter(e => e.date.startsWith(month));
+                        const mRevenue = mInc.reduce((s, i) => s + i.totalPayout, 0);
+                        const mMiles = mInc.reduce((s, i) => s + i.distance, 0);
+                        const mFuel = mExp.filter(e => e.category === 'Fuel' || e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
+                        const mOther = mExp.filter(e => e.category !== 'Fuel' && e.category !== 'Deadhead').reduce((s, e) => s + e.amount, 0);
+                        const mHidden = mMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
+                        const mProfit = mRevenue - mFuel - mOther - mHidden;
+                        const mTax = Math.max(0, mProfit) * TOTAL_TAX_RATE;
+                        const mNet = mProfit - mTax;
+                        return (
+                          <tr key={month}>
+                            <td style={{ fontWeight: 700 }}>{new Date(month + '-01').toLocaleString('en-US', { month: 'short', year: 'numeric' })}</td>
+                            <td>{mInc.length}</td>
+                            <td>{mMiles.toLocaleString()}</td>
+                            <td className="text-success">{formatCurrency(mRevenue)}</td>
+                            <td className="text-danger">{formatCurrency(mFuel)}</td>
+                            <td className="text-danger">{formatCurrency(mOther)}</td>
+                            <td className="text-danger">{formatCurrency(mHidden)}</td>
+                            <td className="text-danger">{formatCurrency(mTax)}</td>
+                            <td style={{ fontWeight: 800, color: mNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mNet)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Tax Reminder */}
+              <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid var(--danger)' }}>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--danger)' }}>1099-NEC Quarterly Estimated Tax</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', fontSize: '0.8rem' }}>
+                  {[{ q: 'Q1 (Jan-Mar)', due: 'Apr 15' }, { q: 'Q2 (Apr-Jun)', due: 'Jun 15' }, { q: 'Q3 (Jul-Sep)', due: 'Sep 15' }, { q: 'Q4 (Oct-Dec)', due: 'Jan 15' }].map(q => (
+                    <div key={q.q} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.75rem' }}>{q.q}</div>
+                      <div className="text-danger" style={{ fontWeight: 800, marginTop: '0.25rem' }}>{formatCurrency(analysis.estimatedTax / 4)}</div>
+                      <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.15rem' }}>Due {q.due}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ====== MAP ====== */}
         {activeTab === 'map' && (
