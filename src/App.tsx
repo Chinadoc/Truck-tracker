@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
   Truck,
@@ -232,16 +232,28 @@ const buildExpenses = (): Expense[] => {
 const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
+// localStorage helpers
+const loadState = <T,>(key: string, fallback: T): T => {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'map' | 'calendar' | 'reports'>('dashboard');
-  const [incomes, setIncomes] = useState<Income[]>(INITIAL_TRIPS);
-  const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
+  const [incomes, setIncomes] = useState<Income[]>(() => loadState('rl_incomes', INITIAL_TRIPS));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadState('rl_expenses', INITIAL_EXPENSES));
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
   const [pdfText, setPdfText] = useState<string>('');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
+
+  // Persist to localStorage on change
+  useEffect(() => { localStorage.setItem('rl_incomes', JSON.stringify(incomes)); }, [incomes]);
+  useEffect(() => { localStorage.setItem('rl_expenses', JSON.stringify(expenses)); }, [expenses]);
+
+  // Future/pending trip check
+  const isFutureTrip = (date: string) => new Date(date) > new Date();
 
   // Derived
   const totalIncome = useMemo(() => incomes.reduce((s, i) => s + i.totalPayout, 0), [incomes]);
@@ -684,6 +696,7 @@ function App() {
                                     <div className="font-medium text-accent">{inc.originCity}</div>
                                     <div className="text-secondary" style={{ fontSize: '0.75rem' }}>→ {inc.destCity}</div>
                                     {inc.deadheadMiles ? <div style={{ fontSize: '0.65rem', color: '#f97316' }}>+{inc.deadheadMiles} mi deadhead</div> : null}
+                                    {isFutureTrip(inc.date) ? <span style={{ fontSize: '0.55rem', background: 'rgba(234,179,8,0.15)', color: '#eab308', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 700, marginTop: '0.15rem', display: 'inline-block' }}>⏳ PENDING</span> : null}
                                   </>
                                 )}
                               </td>
