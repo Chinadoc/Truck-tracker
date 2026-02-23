@@ -171,62 +171,62 @@ const INITIAL_DEBTS: Debt[] = [
 // === REAL TRIP DATA ===
 const INITIAL_TRIPS: Income[] = [
   {
-    id: 't1', date: '2026-02-15',
+    id: 't1', date: '2026-02-09',
     loadId: 'SLC-AUS-001', broker: 'Spot Market',
     distance: 1330, ratePerMile: 2700 / 1330, totalPayout: 2700,
     originCity: 'Salt Lake City, UT', destCity: 'Austin, TX',
     originCoords: [40.7608, -111.8910], destCoords: [30.2672, -97.7431],
     fuelRegion: 'UT', destFuelRegion: 'TX',
-    departureTime: '2026-02-15T06:00', arrivalTime: '2026-02-16T18:00',
+    departureTime: '2026-02-09T06:00', arrivalTime: '2026-02-10T18:00',
   },
   {
-    id: 't2', date: '2026-02-17',
+    id: 't2', date: '2026-02-11',
     loadId: 'TMP-MRG-002', broker: 'Spot Market',
     distance: 1200, ratePerMile: 2200 / 1200, totalPayout: 2200,
     originCity: 'Temple, TX', destCity: 'Marengo, OH',
     originCoords: [31.0982, -97.3428], destCoords: [40.4006, -81.4468],
     fuelRegion: 'TX', destFuelRegion: 'OH',
     deadheadMiles: 70, deadheadFrom: 'Austin, TX → Temple, TX',
-    departureTime: '2026-02-17T05:00', arrivalTime: '2026-02-18T20:00',
+    departureTime: '2026-02-11T05:00', arrivalTime: '2026-02-12T20:00',
   },
   {
-    id: 't3', date: '2026-02-19',
+    id: 't3', date: '2026-02-13',
     loadId: 'OH-LV-003', broker: 'Spot Market',
     distance: 2000, ratePerMile: 4000 / 2000, totalPayout: 4000,
     originCity: 'Ashland, OH 44805', destCity: 'Las Vegas, NV 89139',
     originCoords: [40.8687, -82.3182], destCoords: [36.1699, -115.1398],
     fuelRegion: 'OH', destFuelRegion: 'NV',
     deadheadMiles: 20, deadheadFrom: 'Marengo → Ashland, OH',
-    departureTime: '2026-02-19T04:00', arrivalTime: '2026-02-21T14:00',
+    departureTime: '2026-02-13T04:00', arrivalTime: '2026-02-15T14:00',
   },
   {
-    id: 't4', date: '2026-02-22',
+    id: 't4', date: '2026-02-16',
     loadId: 'LV-CA-004', broker: 'Spot Market',
     distance: 275, ratePerMile: 700 / 275, totalPayout: 700,
     originCity: 'Las Vegas, NV 89139', destCity: 'La Mirada, CA 90631',
     originCoords: [36.1699, -115.1398], destCoords: [33.9172, -118.0120],
     fuelRegion: 'NV', destFuelRegion: 'CA',
-    departureTime: '2026-02-22T07:00', arrivalTime: '2026-02-22T12:00',
+    departureTime: '2026-02-16T07:00', arrivalTime: '2026-02-16T12:00',
   },
   {
-    id: 't5', date: '2026-02-23',
+    id: 't5', date: '2026-02-17',
     loadId: 'CA-GP-005', broker: 'Spot Market',
     distance: 1435, ratePerMile: 3050 / 1435, totalPayout: 3050,
     originCity: 'Walnut, CA 91789', destCity: 'Grand Prairie, TX 75050',
     originCoords: [34.0203, -117.8654], destCoords: [32.7460, -96.9978],
     fuelRegion: 'CA', destFuelRegion: 'TX',
     deadheadMiles: 5, deadheadFrom: 'La Mirada → Walnut, CA',
-    departureTime: '2026-02-23T03:00', arrivalTime: '2026-02-24T22:00',
+    departureTime: '2026-02-17T03:00', arrivalTime: '2026-02-18T22:00',
   },
   {
-    id: 't6', date: '2026-02-25',
+    id: 't6', date: '2026-02-20',
     loadId: 'FW-HOU-006', broker: 'Spot Market',
     distance: 250, ratePerMile: 700 / 250, totalPayout: 700,
     originCity: 'Fort Worth, TX 76137', destCity: 'Houston, TX 77038',
     originCoords: [32.7555, -97.3308], destCoords: [29.8543, -95.4147],
     fuelRegion: 'TX', destFuelRegion: 'TX',
     deadheadMiles: 15, deadheadFrom: 'Grand Prairie → Fort Worth, TX',
-    departureTime: '2026-02-25T06:00', arrivalTime: '2026-02-25T10:30',
+    departureTime: '2026-02-20T06:00', arrivalTime: '2026-02-20T10:30',
   },
   {
     id: 't7', date: '2026-02-27',
@@ -282,7 +282,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
