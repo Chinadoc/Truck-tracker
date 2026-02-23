@@ -53,11 +53,41 @@ const THREE_YEAR_MILES = 360000;
 const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
 const CASCADIA_MAINT_RESERVE = 0.15;
 const MPG = 7.0; // actual reported MPG
+const TOTAL_TAX_RATE = 0.273;
+
+// Pashto translations — bilingual labels
+const PS: Record<string, string> = {
+  'Dashboard': 'ډشبورډ', 'Income & Loads': 'عاید او بارونه', 'Expenses': 'لګښتونه',
+  'Calendar': 'جنتری', 'Reports': 'راپورونه', 'Personal': 'شخصي', 'Route Map': 'د لارې نقشه',
+  'Date': 'نیټه', 'Route': 'لار', 'Miles': 'مایل', 'Rate/Mi': 'نرخ/مایل',
+  'Payout': 'تادیه', 'Fuel Cost': 'د تیلو لګښت', 'Net': 'خالص ګټه',
+  'Add Load': 'بار اضافه', 'Upload Manifest': 'مانیفست اپلوډ',
+  'Edit': 'سمول', 'Save': 'خوندي', 'Pending': 'پاتې',
+  'Gross Revenue': 'ټول عاید', 'Total True Costs': 'ټول لګښتونه', 'True Net Profit': 'خالص ګټه',
+  'Monthly Break-Even': 'میاشتنی بریک ایون',
+  'Insurance': 'بیمه', 'Trailer': 'ټریلر', 'Tolls': 'ټولونه', 'Dispatch': 'ډسپیچ',
+  'Depreciation': 'استهلاک', 'Maintenance': 'ساتنه', 'Debt': 'قرض',
+  'Month': 'میاشت', 'Trips': 'سفرونه', 'Revenue': 'عاید', 'Fuel': 'تیل',
+  'Total': 'ټول', 'Profit': 'ګټه', 'Loss': 'زیان',
+  'Owner-Operator Command Center': 'د مالک-چلونکي کمانډ مرکز',
+  'Head-to-Head': 'مقایسه', 'Company Driver': 'د شرکت ډرایور',
+  'Tax': 'مالیه', 'Reserve': 'ذخیره', 'Surplus': 'اضافي',
+  'Profit & Loss Reports': 'د ګټې او زیان راپورونه',
+  'Debt Tracker': 'د قرض تعقیب', 'Monthly Obligations': 'میاشتنی مکلفیتونه',
+  'Where Every Dollar Goes (Per Mile)': 'هر ډالر چیرته ځي (په مایل)',
+  'Expense Buckets (Filling Up)': 'د لګښت بکسونه',
+  'Reserve Funds Building Up': 'ذخیره فنډونه',
+  '1099 Tax Estimate': 'د ۱۰۹۹ مالیه اټکل',
+  'Seasonal Rate Outlook': 'فصلي نرخ چشم انداز',
+  'Income vs Expenses (Monthly)': 'عاید مقابل لګښتونه (میاشتنی)',
+  'Where Your Revenue Goes': 'ستاسو عاید چیرته ځي',
+};
+const bi = (en: string) => <>{en} <span style={{ fontSize: '0.65em', opacity: 0.6, fontFamily: 'system-ui' }}>{PS[en] ?? ''}</span></>;
 
 // Tax constants (1099 self-employment)
 const SE_TAX_RATE = 0.153; // 15.3% (SS 12.4% + Medicare 2.9%)
 const FED_TAX_RATE = 0.12; // estimated federal bracket
-const TOTAL_TAX_RATE = SE_TAX_RATE + FED_TAX_RATE; // ~27.3%
+// const TOTAL_TAX_RATE = SE_TAX_RATE + FED_TAX_RATE; // ~27.3% - This is now defined above as a fixed value
 
 // Seasonal rate multipliers (spot market averages)
 const SEASONAL_RATES: Record<string, { label: string; multiplier: number; months: string }> = {
@@ -510,16 +540,16 @@ function App() {
         <div className="brand"><Truck size={28} className="text-accent" /><span>Road Ledger</span></div>
         <nav className="nav-links mt-8">
           {([
-            { tab: 'dashboard' as const, icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-            { tab: 'income' as const, icon: <TrendingUp size={20} className={activeTab === 'income' ? 'text-accent' : 'text-success'} />, label: 'Income & Loads' },
-            { tab: 'expenses' as const, icon: <TrendingDown size={20} className={activeTab === 'expenses' ? 'text-accent' : 'text-danger'} />, label: 'Expenses' },
-            { tab: 'calendar' as const, icon: <CalendarDays size={20} className={activeTab === 'calendar' ? 'text-accent' : 'text-secondary'} />, label: 'Calendar' },
-            { tab: 'reports' as const, icon: <FileText size={20} className={activeTab === 'reports' ? 'text-accent' : 'text-secondary'} />, label: 'Reports' },
-            { tab: 'personal' as const, icon: <DollarSign size={20} className={activeTab === 'personal' ? 'text-accent' : 'text-secondary'} />, label: 'Personal' },
-            { tab: 'map' as const, icon: <MapPin size={20} className={activeTab === 'map' ? 'text-accent' : 'text-secondary'} />, label: 'Route Map' },
+            { tab: 'dashboard' as const, icon: <LayoutDashboard size={20} />, label: 'Dashboard', ps: 'ډشبورډ' },
+            { tab: 'income' as const, icon: <TrendingUp size={20} className={activeTab === 'income' ? 'text-accent' : 'text-success'} />, label: 'Income & Loads', ps: 'عاید او بارونه' },
+            { tab: 'expenses' as const, icon: <TrendingDown size={20} className={activeTab === 'expenses' ? 'text-accent' : 'text-danger'} />, label: 'Expenses', ps: 'لګښتونه' },
+            { tab: 'calendar' as const, icon: <CalendarDays size={20} className={activeTab === 'calendar' ? 'text-accent' : 'text-secondary'} />, label: 'Calendar', ps: 'جنتری' },
+            { tab: 'reports' as const, icon: <FileText size={20} className={activeTab === 'reports' ? 'text-accent' : 'text-secondary'} />, label: 'Reports', ps: 'راپورونه' },
+            { tab: 'personal' as const, icon: <DollarSign size={20} className={activeTab === 'personal' ? 'text-accent' : 'text-secondary'} />, label: 'Personal', ps: 'شخصي' },
+            { tab: 'map' as const, icon: <MapPin size={20} className={activeTab === 'map' ? 'text-accent' : 'text-secondary'} />, label: 'Route Map', ps: 'د لارې نقشه' },
           ]).map(n => (
             <button key={n.tab} className={`nav-item ${activeTab === n.tab ? 'active' : ''}`} onClick={() => setActiveTab(n.tab)}>
-              {n.icon}<span>{n.label}</span>
+              {n.icon}<span style={{ lineHeight: 1.2 }}>{n.label}<br /><span style={{ fontSize: '0.65em', opacity: 0.5 }}>{n.ps}</span></span>
             </button>
           ))}
         </nav>
@@ -531,7 +561,7 @@ function App() {
         {activeTab === 'dashboard' && (
           <div className="animate-fade-in">
             <header className="mb-6">
-              <h1 className="text-3xl font-bold">Owner-Operator Command Center</h1>
+              <h1 className="text-2xl font-bold">{bi('Owner-Operator Command Center')}</h1>
               <p className="text-secondary mt-1">2023 Freightliner Cascadia · 290k mi · {analysis.totalMiles.toLocaleString()} mi this cycle · {totalDeadhead} mi deadhead</p>
             </header>
 
@@ -581,7 +611,7 @@ function App() {
 
               return (
                 <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>📊 Monthly Break-Even</h3>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>📊 {bi('Monthly Break-Even')}</h3>
 
                   {/* Per-mile economics strip */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginBottom: '0.75rem', fontSize: '0.65rem' }}>
@@ -660,7 +690,7 @@ function App() {
               {/* LEFT: Per-Mile & Buckets */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Calculator size={18} className="text-accent" /> Where Every Dollar Goes (Per Mile)
+                  <Calculator size={18} className="text-accent" /> {bi('Where Every Dollar Goes (Per Mile)')}
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
                   {[
@@ -679,7 +709,7 @@ function App() {
                 </div>
 
                 <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Wrench size={14} /> Expense Buckets (Filling Up)
+                  <Wrench size={14} /> {bi('Expense Buckets (Filling Up)')}
                 </h4>
                 {[
                   { name: 'Diesel & DEF (Regional Est.)', amount: analysis.trackedFuelCost, color: 'var(--danger)' },
@@ -710,7 +740,7 @@ function App() {
 
               {/* RIGHT: Head-to-Head */}
               <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={18} className="text-accent" /> Head-to-Head</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={18} className="text-accent" /> {bi('Head-to-Head')}</h3>
                 <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
                   <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><DollarSign size={56} /></div>
                   <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Company Driver</div>
@@ -782,7 +812,7 @@ function App() {
               return (
                 <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <TrendingDown size={18} style={{ color: '#3b82f6' }} /> Where Your Revenue Goes
+                    <TrendingDown size={18} style={{ color: '#3b82f6' }} /> {bi('Where Your Revenue Goes')}
                   </h3>
                   <p className="text-secondary" style={{ fontSize: '0.75rem', marginBottom: '1.25rem' }}>{formatCurrency(totalIncome)} revenue → filling buckets in order of priority</p>
 
@@ -823,7 +853,7 @@ function App() {
                   {/* Reserve Savings — Fill-up Icons */}
                   <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(0,0,0,0.15)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                     <h4 style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      🏦 Reserve Funds Building Up
+                      🏦 {bi('Reserve Funds Building Up')}
                     </h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                       {/* Truck Replacement Fund */}
@@ -901,7 +931,7 @@ function App() {
               {/* Tax Estimate */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <DollarSign size={18} className="text-danger" /> 1099 Tax Estimate
+                  <DollarSign size={18} className="text-danger" /> {bi('1099 Tax Estimate')}
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
@@ -927,7 +957,7 @@ function App() {
               {/* Seasonal Projections */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <TrendingUp size={18} style={{ color: '#eab308' }} /> Seasonal Rate Outlook
+                  <TrendingUp size={18} style={{ color: '#eab308' }} /> {bi('Seasonal Rate Outlook')}
                 </h3>
                 <div style={{ background: 'rgba(234,179,8,0.08)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(234,179,8,0.3)', marginBottom: '0.75rem' }}>
                   <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Current: {analysis.currentSeason.label}</div>
@@ -953,7 +983,7 @@ function App() {
 
             {/* Row 4: Chart */}
             <div className="glass-panel chart-container">
-              <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' }}>Income vs Expenses (Monthly)</h3>
+              <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' }}>{bi('Income vs Expenses (Monthly)')}</h3>
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="90%">
                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -978,7 +1008,7 @@ function App() {
           <div className="animate-fade-in">
             <header className="mb-8 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h1 className="text-3xl font-bold">Income & Loads</h1>
+                <h1 className="text-3xl font-bold">{bi('Income & Loads')}</h1>
                 <p className="text-secondary mt-2">Click a trip to see per-trip cost breakdown</p>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -993,13 +1023,13 @@ function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Route</th>
-                        <th>Miles</th>
-                        <th>Rate/Mi</th>
-                        <th>Payout</th>
-                        <th>Fuel Cost</th>
-                        <th>Net</th>
+                        <th style={{ lineHeight: 1.2 }}>Date <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>نیټه</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Route <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>لار</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Miles <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>مایل</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Rate/Mi <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>نرخ/مایل</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Payout <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>تادیه</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Fuel Cost <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>د تیلو لګښت</span></th>
+                        <th style={{ lineHeight: 1.2 }}>Net <span style={{ fontSize: '0.65em', opacity: 0.5, display: 'block' }}>خالص</span></th>
                         <th></th>
                       </tr>
                     </thead>
@@ -1160,6 +1190,17 @@ function App() {
                           </React.Fragment>
                         );
                       })}
+                      {/* Monthly Totals Row */}
+                      <tr style={{ background: 'rgba(59,130,246,0.08)', borderTop: '2px solid var(--accent)', fontWeight: 700 }}>
+                        <td style={{ fontSize: '0.8rem' }}>Total / ټول</td>
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{incomes.length} trips / سفرونه</td>
+                        <td>{totalMiles.toLocaleString()}</td>
+                        <td>{formatCurrency(totalMiles > 0 ? totalIncome / totalMiles : 0)}</td>
+                        <td className="text-success">{formatCurrency(totalIncome)}</td>
+                        <td className="text-danger">{formatCurrency(completedExpenses.filter(e => e.category === 'Fuel' || e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0))}</td>
+                        <td style={{ color: analysis.ownerOperatorTrueProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.ownerOperatorTrueProfit)}</td>
+                        <td></td>
+                      </tr>
                     </tbody>
                   </table>
                 ) : (
