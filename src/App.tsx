@@ -321,7 +321,11 @@ function App() {
   const totalPersonalMonthly = useMemo(() => personalExpenses.reduce((s, p) => s + p.monthlyAmount, 0), [personalExpenses]);
 
   // Future/pending trip check
-  const isFutureTrip = (date: string) => new Date(date) > new Date();
+  const isFutureTrip = (date: string) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return date > todayStr;
+  };
 
   // Derived — EXCLUDE pending (future) trips from revenue
   const completedIncomes = useMemo(() => incomes.filter(i => !isFutureTrip(i.date)), [incomes]);
@@ -541,86 +545,86 @@ function App() {
               ) : null;
             })()}
 
-            {/* ★ Break-Even Analysis — Top of Dashboard */}
+            {/* ★ Loads-to-Goal Calculator — Top of Dashboard */}
             {(() => {
-              const monthlyFixed = 2400 + 600 + 250 + 100 + 133.33; // insurance+trailer+tolls+lockbox+registration
+              const monthlyFixed = 2400 + 600 + 250 + 100 + 133.33;
               const monthlyPersonal = totalPersonalMonthly;
-              const monthlyTax = analysis.estimatedTax;
-              const monthlyNeed = monthlyFixed + monthlyPersonal + monthlyTax;
-              const avgRatePerMile = totalMiles > 0 ? totalIncome / totalMiles : 2.0;
-              const costPerMile = totalMiles > 0 ? (totalExpenses + analysis.totalHiddenCosts) / totalMiles : 1.50;
-              const netPerMile = avgRatePerMile - costPerMile;
-              const milesNeeded = netPerMile > 0 ? Math.ceil(monthlyNeed / netPerMile) : 99999;
-              const avgTripMiles = totalMiles > 0 ? totalMiles / incomes.filter(i => !isFutureTrip(i.date)).length : 1000;
-              const tripsNeeded = Math.ceil(milesNeeded / avgTripMiles);
-              const currentProgress = totalIncome > 0 ? Math.min(100, (totalIncome / monthlyNeed) * 100) : 0;
-              const breakEvenReached = totalIncome >= monthlyNeed;
-              const remaining = monthlyNeed - totalIncome;
+              const monthlyTax = analysis.estimatedTax > 0 ? analysis.estimatedTax : (totalIncome * TOTAL_TAX_RATE);
+              const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
+              const totalNeed = monthlyFixed + monthlyPersonal + monthlyTax + debtPayment;
+              const earned = totalIncome;
+              const remaining = Math.max(0, totalNeed - earned);
+              const avgTripPay = completedIncomes.length > 0 ? earned / completedIncomes.length : 3000;
+              const avgTripDays = 2; // realistic: 2 days per load
+              const loadsLeft = remaining > 0 ? Math.ceil(remaining / avgTripPay) : 0;
+              const daysLeft = loadsLeft * avgTripDays;
+              const pctDone = totalNeed > 0 ? Math.min(100, (earned / totalNeed) * 100) : 0;
+              const goalMet = earned >= totalNeed;
 
-              // SVG gauge
-              const gaugeR = 70;
-              const gaugeCirc = Math.PI * gaugeR; // half circle
-              const gaugeOffset = gaugeCirc - (Math.min(currentProgress, 100) / 100) * gaugeCirc;
-              const gaugeColor = breakEvenReached ? '#10b981' : currentProgress > 60 ? '#eab308' : '#ef4444';
+              // What's covered vs what's not
+              const layers = [
+                { label: 'Fixed Costs', need: monthlyFixed, color: '#ef4444', icon: '🏢' },
+                { label: 'Personal', need: monthlyPersonal, color: '#eab308', icon: '🏠' },
+                { label: 'Taxes', need: monthlyTax, color: '#f97316', icon: '🏛' },
+                { label: 'Debt', need: debtPayment, color: '#a855f7', icon: '💳' },
+              ];
+              let runningEarned = earned;
 
               return (
-                <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                    {/* Gauge */}
-                    <div style={{ position: 'relative', width: '160px', height: '90px', flexShrink: 0, margin: '0 auto' }}>
-                      <svg width="160" height="90" viewBox="0 0 160 90">
-                        {/* Background arc */}
-                        <path d="M 10 85 A 70 70 0 0 1 150 85" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" strokeLinecap="round" />
-                        {/* Progress arc */}
-                        <path d="M 10 85 A 70 70 0 0 1 150 85" fill="none" stroke={gaugeColor} strokeWidth="10" strokeLinecap="round"
-                          strokeDasharray={gaugeCirc} strokeDashoffset={gaugeOffset}
-                          style={{ transition: 'stroke-dashoffset 2s ease-out, stroke 0.5s ease' }} />
-                        {/* Tick marks */}
-                        {[0, 25, 50, 75, 100].map(pct => {
-                          const angle = Math.PI - (pct / 100) * Math.PI;
-                          const x = 80 + 70 * Math.cos(angle);
-                          const y = 85 - 70 * Math.sin(angle);
-                          return <circle key={pct} cx={x} cy={y} r="2" fill="rgba(255,255,255,0.2)" />;
-                        })}
-                      </svg>
-                      <div style={{ position: 'absolute', bottom: '0', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: gaugeColor, lineHeight: 1 }}>{currentProgress.toFixed(0)}%</div>
-                        <div style={{ fontSize: '0.5rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>to break-even</div>
+                <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {goalMet ? '✅' : '🎯'} {goalMet ? 'Monthly Goals Met!' : 'Loads to Cover Your Nut'}
+                  </h3>
+
+                  {/* Stacked progress — what's covered */}
+                  <div style={{ display: 'flex', height: '24px', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.3)' }}>
+                    {layers.map((l, i) => {
+                      const covered = Math.min(runningEarned, l.need);
+                      runningEarned -= covered;
+                      const pct = totalNeed > 0 ? (covered / totalNeed) * 100 : 0;
+                      return pct > 0 ? (
+                        <div key={i} title={`${l.label}: ${formatCurrency(covered)} / ${formatCurrency(l.need)}`}
+                          style={{ width: `${pct}%`, background: l.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', fontWeight: 700, color: '#fff', transition: 'width 1s ease' }}>
+                          {pct > 6 ? l.icon : ''}
+                        </div>
+                      ) : null;
+                    })}
+                    {remaining > 0 && <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', color: 'var(--text-secondary)' }}>{formatCurrency(remaining)} left</div>}
+                  </div>
+
+                  {/* Mini buckets showing what's covered */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginBottom: '0.75rem', fontSize: '0.65rem' }}>
+                    {(() => {
+                      let r = earned; return layers.map((l, i) => {
+                        const covered = Math.min(r, l.need);
+                        r -= covered;
+                        const done = covered >= l.need;
+                        return (
+                          <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.35rem 0.5rem', borderLeft: `3px solid ${l.color}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{l.icon} {l.label}</span>
+                              <span style={{ fontWeight: 700, color: done ? 'var(--success)' : l.color, fontSize: '0.6rem' }}>{done ? '✓' : formatCurrency(l.need - covered)}</span>
+                            </div>
+                            <div style={{ fontSize: '0.5rem', color: 'var(--text-secondary)' }}>{formatCurrency(l.need)}/mo</div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Bottom line: loads remaining */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', background: goalMet ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)', borderRadius: '8px', border: `1px solid ${goalMet ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: goalMet ? 'var(--success)' : 'var(--text-primary)' }}>
+                        {goalMet ? `${formatCurrency(earned - totalNeed)} surplus this cycle` : `${loadsLeft} more load${loadsLeft !== 1 ? 's' : ''} needed`}
+                      </div>
+                      <div className="text-secondary" style={{ fontSize: '0.55rem' }}>
+                        {goalMet ? `Covered all ${formatCurrency(totalNeed)} in obligations` : `≈ ${daysLeft} days · @ ${formatCurrency(avgTripPay)} avg payout`}
                       </div>
                     </div>
-
-                    {/* Stats */}
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                      <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        {breakEvenReached ? '✅' : '🎯'} Break-Even Analysis
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.7rem' }}>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
-                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Need Monthly</div>
-                          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--danger)' }}>{formatCurrency(monthlyNeed)}</div>
-                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>Biz + Personal + Tax</div>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
-                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Miles/Mo</div>
-                          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f97316' }}>{milesNeeded.toLocaleString()}</div>
-                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>@ ${netPerMile.toFixed(2)} net/mi</div>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
-                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Trips/Mo</div>
-                          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#3b82f6' }}>{tripsNeeded}</div>
-                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>@ {avgTripMiles.toFixed(0)} mi avg</div>
-                        </div>
-                      </div>
-                      {/* Progress bar + status */}
-                      <div style={{ marginTop: '0.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', marginBottom: '0.2rem' }}>
-                          <span className="text-secondary">Earned: {formatCurrency(totalIncome)}</span>
-                          <span style={{ color: gaugeColor, fontWeight: 700 }}>{breakEvenReached ? `+${formatCurrency(totalIncome - monthlyNeed)} surplus` : `${formatCurrency(remaining)} to go`}</span>
-                        </div>
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${Math.min(100, currentProgress)}%`, height: '100%', background: `linear-gradient(90deg, ${gaugeColor}, ${breakEvenReached ? '#10b981' : gaugeColor}88)`, borderRadius: '3px', transition: 'width 2s ease-out' }} />
-                        </div>
-                      </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: goalMet ? 'var(--success)' : 'var(--danger)' }}>{pctDone.toFixed(0)}%</div>
+                      <div className="text-secondary" style={{ fontSize: '0.5rem' }}>covered</div>
                     </div>
                   </div>
                 </div>
