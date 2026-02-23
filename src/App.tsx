@@ -951,10 +951,92 @@ function App() {
         {/* ====== EXPENSES ====== */}
         {activeTab === 'expenses' && (
           <div className="animate-fade-in">
-            <header className="mb-8 flex justify-between items-center flex-wrap gap-4">
+            <header className="mb-6 flex justify-between items-center flex-wrap gap-4">
               <div><h1 className="text-3xl font-bold">Business Expenses</h1><p className="text-secondary mt-2">Fuel, deadhead, maintenance, and operational costs</p></div>
               <button className="btn-primary flex items-center gap-2" onClick={() => setIsExpenseModalOpen(true)}><Plus size={18} /> Add Expense</button>
             </header>
+
+            {/* Fixed vs Variable Breakdown */}
+            {(() => {
+              const fixedItems = [
+                { name: 'Truck Insurance', monthly: 2400, icon: '🛡' },
+                { name: 'Trailer Rental', monthly: 600, icon: '🚛' },
+                { name: 'Tolls & Scales', monthly: 250, icon: '🛣' },
+                { name: 'Registration', monthly: Math.round(1600 / 12 * 100) / 100, icon: '📋' },
+                { name: 'Lock Box', monthly: 100, icon: '🔒' },
+              ];
+              const totalFixed = fixedItems.reduce((s, f) => s + f.monthly, 0);
+
+              const variableItems = [
+                { name: 'Fuel (Diesel + DEF)', amount: analysis.trackedFuelCost, rate: `$${(analysis.trackedFuelCost / Math.max(1, totalMiles)).toFixed(2)}/mi`, icon: '⛽' },
+                { name: 'Dispatch (10%)', amount: totalIncome * 0.10, rate: '10% of revenue', icon: '📞' },
+                { name: 'Depreciation Reserve', amount: analysis.vehicleDepreciation, rate: `$${CASCADIA_DEPR_RATE.toFixed(3)}/mi`, icon: '📉' },
+                { name: 'Maintenance Reserve', amount: analysis.maintReserve, rate: `$${CASCADIA_MAINT_RESERVE.toFixed(2)}/mi`, icon: '🔧' },
+                { name: 'Deadhead Fuel', amount: expenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), rate: `${totalDeadhead} empty mi`, icon: '🔄' },
+                { name: 'Road Food', amount: expenses.filter(e => e.category === 'Food').reduce((s, e) => s + e.amount, 0), rate: '~$20/day on road', icon: '🍔' },
+              ];
+              const totalVariable = variableItems.reduce((s, v) => s + v.amount, 0);
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+
+                  {/* Fixed */}
+                  <div className="glass-panel" style={{ padding: '1.25rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>🔒</span> Fixed Costs
+                      <span className="text-secondary" style={{ fontSize: '0.65rem', fontWeight: 500, marginLeft: 'auto' }}>Same every month</span>
+                    </h3>
+                    {fixedItems.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.8rem' }}>
+                        <span>{f.icon} {f.name}</span>
+                        <span className="text-danger" style={{ fontWeight: 700 }}>{formatCurrency(f.monthly)}/mo</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>Monthly Nut</span>
+                      <span className="text-danger" style={{ fontWeight: 800, fontSize: '1rem' }}>{formatCurrency(totalFixed)}/mo</span>
+                    </div>
+                    <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.35rem', textAlign: 'right' }}>{formatCurrency(totalFixed * 12)}/year</div>
+                  </div>
+
+                  {/* Variable */}
+                  <div className="glass-panel" style={{ padding: '1.25rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>📈</span> Variable Costs
+                      <span className="text-secondary" style={{ fontSize: '0.65rem', fontWeight: 500, marginLeft: 'auto' }}>Scale with miles/trips</span>
+                    </h3>
+                    {variableItems.map((v, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.8rem' }}>
+                        <span style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span>{v.icon} {v.name}</span>
+                          <span className="text-secondary" style={{ fontSize: '0.6rem' }}>{v.rate}</span>
+                        </span>
+                        <span className="text-danger" style={{ fontWeight: 700 }}>{formatCurrency(v.amount)}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(249,115,22,0.08)', borderRadius: '8px', border: '1px solid rgba(249,115,22,0.2)' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>This Cycle Total</span>
+                      <span style={{ fontWeight: 800, fontSize: '1rem', color: '#f97316' }}>{formatCurrency(totalVariable)}</span>
+                    </div>
+                    <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.35rem', textAlign: 'right' }}>{formatCurrency(totalVariable / Math.max(1, totalMiles))}/mi all-in variable</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Total Burn Rate Summary */}
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '3px solid var(--danger)' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Total Business Burn Rate</div>
+                <div className="text-secondary" style={{ fontSize: '0.7rem' }}>Fixed monthly + variable this cycle + hidden reserves</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="text-danger" style={{ fontWeight: 800, fontSize: '1.3rem' }}>{formatCurrency(totalExpenses + analysis.totalHiddenCosts)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.65rem' }}>vs {formatCurrency(totalIncome)} revenue = <span style={{ color: totalIncome > totalExpenses + analysis.totalHiddenCosts ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(totalIncome - totalExpenses - analysis.totalHiddenCosts)}</span></div>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem' }}>📋 All Expense Transactions</h3>
             <div className="glass-panel p-0 overflow-hidden">
               <div className="table-container">
                 {expenses.length > 0 ? (
