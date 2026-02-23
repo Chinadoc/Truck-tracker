@@ -485,7 +485,7 @@ function App() {
       setPdfText(fullText);
     } catch (err) {
       console.error('PDF parse error:', err);
-      setPdfText('Error reading PDF. Try a different file or paste the text manually.');
+      setPdfText(`⚠ Could not read this PDF — it may be image-based or scanned.\n\nTry instead:\n• Paste the text directly into the box below\n• Use CSV format: date,origin,dest,miles,pay,broker\n• Take a screenshot and enter manually\n\nError: ${err instanceof Error ? err.message : 'Unknown format'}`);
     }
     setPdfLoading(false);
   };
@@ -539,6 +539,92 @@ function App() {
                   </div>
                 </div>
               ) : null;
+            })()}
+
+            {/* ★ Break-Even Analysis — Top of Dashboard */}
+            {(() => {
+              const monthlyFixed = 2400 + 600 + 250 + 100 + 133.33; // insurance+trailer+tolls+lockbox+registration
+              const monthlyPersonal = totalPersonalMonthly;
+              const monthlyTax = analysis.estimatedTax;
+              const monthlyNeed = monthlyFixed + monthlyPersonal + monthlyTax;
+              const avgRatePerMile = totalMiles > 0 ? totalIncome / totalMiles : 2.0;
+              const costPerMile = totalMiles > 0 ? (totalExpenses + analysis.totalHiddenCosts) / totalMiles : 1.50;
+              const netPerMile = avgRatePerMile - costPerMile;
+              const milesNeeded = netPerMile > 0 ? Math.ceil(monthlyNeed / netPerMile) : 99999;
+              const avgTripMiles = totalMiles > 0 ? totalMiles / incomes.filter(i => !isFutureTrip(i.date)).length : 1000;
+              const tripsNeeded = Math.ceil(milesNeeded / avgTripMiles);
+              const currentProgress = totalIncome > 0 ? Math.min(100, (totalIncome / monthlyNeed) * 100) : 0;
+              const breakEvenReached = totalIncome >= monthlyNeed;
+              const remaining = monthlyNeed - totalIncome;
+
+              // SVG gauge
+              const gaugeR = 70;
+              const gaugeCirc = Math.PI * gaugeR; // half circle
+              const gaugeOffset = gaugeCirc - (Math.min(currentProgress, 100) / 100) * gaugeCirc;
+              const gaugeColor = breakEvenReached ? '#10b981' : currentProgress > 60 ? '#eab308' : '#ef4444';
+
+              return (
+                <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                    {/* Gauge */}
+                    <div style={{ position: 'relative', width: '160px', height: '90px', flexShrink: 0, margin: '0 auto' }}>
+                      <svg width="160" height="90" viewBox="0 0 160 90">
+                        {/* Background arc */}
+                        <path d="M 10 85 A 70 70 0 0 1 150 85" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" strokeLinecap="round" />
+                        {/* Progress arc */}
+                        <path d="M 10 85 A 70 70 0 0 1 150 85" fill="none" stroke={gaugeColor} strokeWidth="10" strokeLinecap="round"
+                          strokeDasharray={gaugeCirc} strokeDashoffset={gaugeOffset}
+                          style={{ transition: 'stroke-dashoffset 2s ease-out, stroke 0.5s ease' }} />
+                        {/* Tick marks */}
+                        {[0, 25, 50, 75, 100].map(pct => {
+                          const angle = Math.PI - (pct / 100) * Math.PI;
+                          const x = 80 + 70 * Math.cos(angle);
+                          const y = 85 - 70 * Math.sin(angle);
+                          return <circle key={pct} cx={x} cy={y} r="2" fill="rgba(255,255,255,0.2)" />;
+                        })}
+                      </svg>
+                      <div style={{ position: 'absolute', bottom: '0', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: gaugeColor, lineHeight: 1 }}>{currentProgress.toFixed(0)}%</div>
+                        <div style={{ fontSize: '0.5rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>to break-even</div>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {breakEvenReached ? '✅' : '🎯'} Break-Even Analysis
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.7rem' }}>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
+                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Need Monthly</div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--danger)' }}>{formatCurrency(monthlyNeed)}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>Biz + Personal + Tax</div>
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
+                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Miles/Mo</div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f97316' }}>{milesNeeded.toLocaleString()}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>@ ${netPerMile.toFixed(2)} net/mi</div>
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center' }}>
+                          <div className="text-secondary" style={{ fontSize: '0.55rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Trips/Mo</div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#3b82f6' }}>{tripsNeeded}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>@ {avgTripMiles.toFixed(0)} mi avg</div>
+                        </div>
+                      </div>
+                      {/* Progress bar + status */}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', marginBottom: '0.2rem' }}>
+                          <span className="text-secondary">Earned: {formatCurrency(totalIncome)}</span>
+                          <span style={{ color: gaugeColor, fontWeight: 700 }}>{breakEvenReached ? `+${formatCurrency(totalIncome - monthlyNeed)} surplus` : `${formatCurrency(remaining)} to go`}</span>
+                        </div>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, currentProgress)}%`, height: '100%', background: `linear-gradient(90deg, ${gaugeColor}, ${breakEvenReached ? '#10b981' : gaugeColor}88)`, borderRadius: '3px', transition: 'width 2s ease-out' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
             })()}
 
             {/* Row 1: Big Picture */}
