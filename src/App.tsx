@@ -1026,15 +1026,34 @@ function App() {
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => {
                                       handleEditTrip(inc.id, 'date', e.target.value);
-                                      // Auto-set pickup to date@06:00 if no departure set
-                                      if (!inc.departureTime && e.target.value) {
-                                        handleEditTrip(inc.id, 'departureTime', `${e.target.value}T06:00`);
+                                      // Always sync pickup date when trip date changes
+                                      if (e.target.value) {
+                                        const existingTime = inc.departureTime ? inc.departureTime.split('T')[1] || '06:00' : '06:00';
+                                        handleEditTrip(inc.id, 'departureTime', `${e.target.value}T${existingTime}`);
                                       }
                                     }} />
                                     <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700, marginTop: '0.15rem' }}>PICKUP</div>
-                                    <input type="datetime-local" step="3600" defaultValue={inc.departureTime ?? (inc.date ? `${inc.date}T06:00` : '')} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'departureTime', e.target.value)} />
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                      <input type="date" defaultValue={inc.departureTime ? inc.departureTime.split('T')[0] : inc.date ?? ''} style={{ ...inputStyle, flex: 1, fontSize: '0.7rem' }} onChange={e => {
+                                        const time = inc.departureTime ? inc.departureTime.split('T')[1] || '06:00' : '06:00';
+                                        handleEditTrip(inc.id, 'departureTime', `${e.target.value}T${time}`);
+                                      }} />
+                                      <input type="time" defaultValue={inc.departureTime ? inc.departureTime.split('T')[1] || '06:00' : '06:00'} style={{ ...inputStyle, width: '5rem', fontSize: '0.7rem' }} onChange={e => {
+                                        const date = inc.departureTime ? inc.departureTime.split('T')[0] : inc.date ?? '';
+                                        handleEditTrip(inc.id, 'departureTime', `${date}T${e.target.value}`);
+                                      }} />
+                                    </div>
                                     <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700 }}>DROP-OFF</div>
-                                    <input type="datetime-local" step="3600" defaultValue={inc.arrivalTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'arrivalTime', e.target.value)} />
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                      <input type="date" defaultValue={inc.arrivalTime ? inc.arrivalTime.split('T')[0] : ''} style={{ ...inputStyle, flex: 1, fontSize: '0.7rem' }} onChange={e => {
+                                        const time = inc.arrivalTime ? inc.arrivalTime.split('T')[1] || '08:00' : '08:00';
+                                        handleEditTrip(inc.id, 'arrivalTime', `${e.target.value}T${time}`);
+                                      }} />
+                                      <input type="time" defaultValue={inc.arrivalTime ? inc.arrivalTime.split('T')[1] || '08:00' : ''} style={{ ...inputStyle, width: '5rem', fontSize: '0.7rem' }} onChange={e => {
+                                        const date = inc.arrivalTime ? inc.arrivalTime.split('T')[0] : '';
+                                        handleEditTrip(inc.id, 'arrivalTime', `${date}T${e.target.value}`);
+                                      }} />
+                                    </div>
                                   </div>
                                 ) : (
                                   <>
