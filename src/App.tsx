@@ -13,10 +13,6 @@ import {
   Scale
 } from 'lucide-react';
 
-const COMPANY_DRIVER_RATE = 0.65;
-const TIRE_DEPRECIATION_RATE = 0.03;
-const MAINT_RESERVE_RATE = 0.07;
-const VEHICLE_DEPRECIATION_RATE = 0.17;
 import {
   BarChart,
   Bar,
@@ -28,6 +24,29 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
+
+// Constants for 2023 Freightliner Cascadia Scenario
+const COMPANY_DRIVER_RATE = 0.65;
+const VEHICLE_VALUE = 85000;
+const THREE_YEAR_MILES = 360000; // 120k miles/year
+const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES; // ~$0.236/mi
+const CASCADIA_MAINT_RESERVE = 0.15; // $0.15/mi
+const CASCADIA_FUEL_RATE = 0.55; // Expected $0.55/mi
+
+// Default Trip Cycle Loop
+const today = new Date().toISOString().split('T')[0];
+const INITIAL_TRIPS: Income[] = [
+  { id: 't1', date: today, loadId: 'Utah to Houston, TX', broker: 'Spot Market', distance: 1540, ratePerMile: 2.00, totalPayout: 1540 * 2.00 },
+  { id: 't2', date: today, loadId: 'Houston to Columbus, OH', broker: 'Spot Market', distance: 1140, ratePerMile: 2.00, totalPayout: 1140 * 2.00 },
+  { id: 't3', date: today, loadId: 'Columbus to Las Vegas, NV', broker: 'Spot Market', distance: 2030, ratePerMile: 2.00, totalPayout: 2030 * 2.00 },
+  { id: 't4', date: today, loadId: 'Las Vegas to Los Angeles, CA', broker: 'Spot Market', distance: 270, ratePerMile: 2.00, totalPayout: 270 * 2.00 },
+  { id: 't5', date: today, loadId: 'Los Angeles to Dallas, TX', broker: 'Spot Market', distance: 1440, ratePerMile: 2.00, totalPayout: 1440 * 2.00 },
+  { id: 't6', date: today, loadId: 'Dallas to Houston, TX', broker: 'Spot Market', distance: 240, ratePerMile: 2.00, totalPayout: 240 * 2.00 },
+];
+
+const INITIAL_EXPENSES: Expense[] = [
+  { id: 'e1', date: today, category: 'Fuel', description: 'Expected Fuel Cost @ $0.55/mi (Initial Loop)', amount: 6660 * CASCADIA_FUEL_RATE }
+];
 
 // Types
 type Income = {
@@ -53,8 +72,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses'>('dashboard');
 
   // State
-  const [incomes, setIncomes] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>(INITIAL_TRIPS);
+  const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
 
   // Modals
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -68,10 +87,14 @@ function App() {
 
   // Analysis Data
   const analysis = useMemo(() => {
-    const tireDepreciation = totalMiles * TIRE_DEPRECIATION_RATE;
-    const maintReserve = totalMiles * MAINT_RESERVE_RATE;
-    const vehicleDepreciation = totalMiles * VEHICLE_DEPRECIATION_RATE;
-    const totalHiddenCosts = tireDepreciation + maintReserve + vehicleDepreciation;
+    // We separate active tracked fuel expenses from our expected "savings box" reserves.
+    const expectedFuelCost = totalMiles * CASCADIA_FUEL_RATE;
+    const trackedFuelCost = expenses.filter(e => e.category === 'Fuel').reduce((sum, e) => sum + e.amount, 0);
+
+    // Savings Box Reserves (These are hidden costs you hold back)
+    const maintReserve = totalMiles * CASCADIA_MAINT_RESERVE;
+    const vehicleDepreciation = totalMiles * CASCADIA_DEPR_RATE;
+    const totalHiddenCosts = maintReserve + vehicleDepreciation;
 
     const ownerOperatorCashProfit = totalIncome - totalExpenses;
     const ownerOperatorTrueProfit = ownerOperatorCashProfit - totalHiddenCosts;
@@ -79,7 +102,8 @@ function App() {
 
     return {
       totalMiles,
-      tireDepreciation,
+      expectedFuelCost,
+      trackedFuelCost,
       maintReserve,
       vehicleDepreciation,
       totalHiddenCosts,
@@ -88,7 +112,7 @@ function App() {
       companyEquivalentEarnings,
       isBeatingCompanyRate: ownerOperatorTrueProfit > companyEquivalentEarnings
     };
-  }, [totalIncome, totalExpenses, totalMiles]);
+  }, [totalIncome, totalExpenses, totalMiles, expenses]);
 
   // Chart Data Preparation (Grouping by Month - simple version)
   const chartData = useMemo(() => {
@@ -224,10 +248,15 @@ function App() {
             {/* Trip Cycle Analysis */}
             <div className="glass-panel p-6 mb-8">
               <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] pb-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Calculator size={24} className="text-accent" />
-                  Trip Cycle Financial Analysis
-                </h3>
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Calculator size={24} className="text-accent" />
+                    Trip Cycle Scenario: 2023 Freightliner Cascadia
+                  </h3>
+                  <p className="text-secondary mt-1 text-sm">
+                    Side-by-side comparison assuming 290k miles, depreciating over 3 remaining years
+                  </p>
+                </div>
                 <div className={`px-4 py-2 rounded-full text-sm font-bold border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.1)] text-success border-success' : 'bg-[rgba(239,68,68,0.1)] text-danger border-danger'}`}>
                   {analysis.isBeatingCompanyRate ? 'Beating Company Rate' : 'Below Company Rate'}
                 </div>
@@ -236,22 +265,33 @@ function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4">
                 {/* Column 1: True Profit */}
                 <div className="flex flex-col gap-4">
-                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Owner-Operator (True Net)</p>
+                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Owner-Operator (Side-By-Side)</p>
                   <div className="flex flex-col gap-3">
                     <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2">
-                      <span className="text-secondary">Cash Profit:</span>
-                      <span className="font-bold text-success text-base">{formatCurrency(analysis.ownerOperatorCashProfit)}</span>
+                      <span className="text-secondary">Gross Revenue (Total Miles):</span>
+                      <span className="font-bold text-base">{formatCurrency(totalIncome)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2 text-danger opacity-90">
-                      <span>Vehicle Depr. ($0.17/mi):</span>
-                      <span>-{formatCurrency(analysis.vehicleDepreciation)}</span>
+                      <span>Given Cost: Tracked Fuel & Expenses:</span>
+                      <span>-{formatCurrency(totalExpenses)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2 text-danger opacity-80">
-                      <span>Tires & Maint ($0.10/mi):</span>
-                      <span>-{formatCurrency(analysis.tireDepreciation + analysis.maintReserve)}</span>
+
+                    <div className="bg-[rgba(0,0,0,0.2)] p-4 rounded-xl border border-[var(--border)] mb-2 mt-2">
+                      <p className="text-xs uppercase font-bold text-secondary mb-2 flex items-center gap-2">
+                        <Wrench size={14} /> The "Savings Box" (Likely Expenses)
+                      </p>
+                      <div className="flex justify-between items-center text-sm text-danger opacity-80 mb-1">
+                        <span>Vehicle Depr. (${CASCADIA_DEPR_RATE.toFixed(3)}/mi):</span>
+                        <span>-{formatCurrency(analysis.vehicleDepreciation)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-danger opacity-80">
+                        <span>Maintenance Reserve (${CASCADIA_MAINT_RESERVE.toFixed(2)}/mi):</span>
+                        <span>-{formatCurrency(analysis.maintReserve)}</span>
+                      </div>
                     </div>
+
                     <div className="flex justify-between items-center text-lg font-bold pt-2">
-                      <span>True Profit:</span>
+                      <span>True Profit (Net):</span>
                       <span className="text-accent">{formatCurrency(analysis.ownerOperatorTrueProfit)}</span>
                     </div>
                   </div>
@@ -262,11 +302,11 @@ function App() {
                   <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Old Company Equivalent</p>
                   <div className="flex flex-col gap-3">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-secondary">Total Miles:</span>
+                      <span className="text-secondary">Total Miles Analyzed:</span>
                       <span className="font-bold text-base">{analysis.totalMiles.toLocaleString()} mi</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-secondary">Old Rate:</span>
+                      <span className="text-secondary">Company Rate:</span>
                       <span className="font-bold text-base">${COMPANY_DRIVER_RATE.toFixed(2)}/mi</span>
                     </div>
                     <div className="flex justify-between items-center text-lg font-bold pt-4 border-t border-[var(--border)]">
@@ -280,16 +320,14 @@ function App() {
               <div className="mt-6 p-4 bg-[var(--surface-hover)] rounded-xl border-l-4 border-accent flex items-start gap-4">
                 <div className="pt-1"><Scale size={24} className="text-accent" /></div>
                 <div>
-                  <h4 className="font-bold mb-1">Hidden Costs Breakdown</h4>
-                  <p className="text-sm text-secondary mb-3">Based on an estimated $85,000 purchase price, your truck loses value every mile:</p>
+                  <h4 className="font-bold mb-1">Performance Details</h4>
+                  <p className="text-sm text-secondary mb-3">Comparing your actual recorded expenses versus the standard $0.65 margin.</p>
                   <div className="flex gap-4 flex-wrap">
                     <div className="bg-[rgba(0,0,0,0.3)] px-3 py-2 rounded-lg border border-[var(--border)]">
-                      <span className="text-xs uppercase text-secondary block mb-1">Asset Depr.</span>
-                      <span className="font-semibold text-danger">-{formatCurrency(analysis.vehicleDepreciation)}</span>
-                    </div>
-                    <div className="bg-[rgba(0,0,0,0.3)] px-3 py-2 rounded-lg border border-[var(--border)]">
-                      <span className="text-xs uppercase text-secondary block mb-1">Reserves</span>
-                      <span className="font-semibold text-danger">-{formatCurrency(analysis.tireDepreciation + analysis.maintReserve)}</span>
+                      <span className="text-xs uppercase text-secondary block mb-1">Net Gain vs Company</span>
+                      <span className={`font-semibold ${analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {formatCurrency(analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings)}
+                      </span>
                     </div>
                   </div>
                 </div>
