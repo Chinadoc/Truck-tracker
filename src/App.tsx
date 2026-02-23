@@ -1531,47 +1531,121 @@ function App() {
                       <div style={{ color: '#3b82f6', fontSize: '0.65rem', fontWeight: 700, marginTop: '0.35rem' }}>+$0.30–0.50/mi higher rates</div>
                     </div>
                   </div>
+                  {/* Flatbed Purchase Detail */}
+                  <div style={{ marginTop: '0.6rem', fontSize: '0.65rem' }}>
+                    <div style={{ fontWeight: 700, color: '#3b82f6', marginBottom: '0.35rem' }}>🔩 Flatbed Purchase Breakdown:</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(59,130,246,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>Trailer</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Used 48' aluminum flatbed</div>
+                        <div style={{ color: '#3b82f6', fontWeight: 700, marginTop: '0.15rem' }}>$10k–$18k</div>
+                        <div className="text-secondary" style={{ fontSize: '0.55rem' }}>Great Wall, Fontaine, Reitnouer</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(59,130,246,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>Startup Gear</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Tarps (4×), chains, binders, straps, edge protectors, coil racks</div>
+                        <div style={{ color: '#f97316', fontWeight: 700, marginTop: '0.15rem' }}>$1,500–$2,500</div>
+                      </div>
+                      <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>ROI vs Dry Van Rental</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Eliminates $600/mo rental. Higher rates (+$0.30-0.50/mi).</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>Breakeven: 8–14 months</div>
+                        <div className="text-secondary" style={{ fontSize: '0.55rem' }}>Then $7,200/yr+ pure savings</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Lock Box */}
+                {/* Lock Box: Rent vs Buy */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🔒 Lock Box: Rent vs Own</h4>
-                  <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.75rem' }}>
+                  <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
                     <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
                       <div style={{ fontWeight: 700, color: 'var(--danger)' }}>Current: Rent @ $100/mo</div>
                       <div>$1,200/year ongoing forever</div>
+                      <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>Over 3 years = $3,600 with nothing to show for it.</div>
                     </div>
                     <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
                       <div style={{ fontWeight: 700, color: 'var(--success)' }}>Buy: $300–$600 one-time</div>
                       <div>Pays for itself in 3–6 months. <strong>Save $600–900/yr.</strong></div>
                     </div>
                   </div>
+                  <div style={{ fontSize: '0.7rem', marginBottom: '0.4rem', fontWeight: 700, color: 'var(--text-secondary)' }}>🛒 Purchase Options:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', fontSize: '0.65rem' }}>
+                    {[
+                      { name: 'Landing Gear Lock', price: '$80–$150', desc: 'Prevents cranking legs. Bolt-on, keyed alike.', brand: 'Bully Locks / Enforcer' },
+                      { name: 'King Pin Lock', price: '$60–$120', desc: 'Prevents trailer hookup. Heavy-duty steel.', brand: 'Master Lock 387KA / Reese' },
+                      { name: 'Glad Hand Locks', price: '$30–$60 (pair)', desc: 'Blocks air brake connections. Quick install.', brand: 'Paclock / TydenBrooks' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.7rem' }}>{item.name}</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>{item.price}</div>
+                        <div style={{ color: 'var(--accent)', fontSize: '0.55rem' }}>{item.brand}</div>
+                        <div className="text-secondary" style={{ fontSize: '0.55rem', marginTop: '0.1rem' }}>{item.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '0.4rem', fontSize: '0.65rem', padding: '0.3rem 0.5rem', background: 'rgba(16,185,129,0.06)', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <strong style={{ color: 'var(--success)' }}>💰 Full kit: $170–$330 total.</strong> Pays for itself in ~2–3 months vs $100/mo rental. 3-year savings: <strong>$3,270–$3,430</strong>.
+                  </div>
                 </div>
 
                 {/* Insurance Breakdown */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🛡 Insurance Breakdown — $2,400/mo Bundle</h4>
+                  <div style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '10px', padding: '0.75rem', marginBottom: '0.6rem', fontSize: '0.7rem' }}>
+                    <div style={{ fontWeight: 700, color: '#eab308', marginBottom: '0.3rem' }}>⚠ Why So High? You own the truck outright!</div>
+                    <div className="text-secondary" style={{ fontSize: '0.65rem', lineHeight: 1.5 }}>
+                      $2,400/mo ($28,800/yr) is on the <strong>high end</strong> for an O/O who owns outright. Many carriers with liens pay $1,800–2,200/mo because the lender requires full coverage. Since you <strong>own</strong> the Cascadia free and clear, you have options:
+                    </div>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '0.5rem', fontSize: '0.7rem' }}>
                     {[
-                      { type: 'Primary Liability', range: '$5k–$12k/yr', desc: '$750k–$1M coverage. Required by FMCSA.', req: true },
-                      { type: 'Cargo Insurance', range: '$1.5k–$3k/yr', desc: '$100k cargo coverage. Required by brokers.', req: true },
-                      { type: 'Physical Damage', range: '$4k–$8k/yr', desc: 'Covers YOUR truck. Can drop if paid off.', req: false },
-                      { type: 'Bobtail / NTL', range: '$400–$800/yr', desc: 'Driving without trailer coverage.', req: true },
-                      { type: 'Occupational Accident', range: '$1.5k–$3k/yr', desc: "Workers comp for 1099 drivers.", req: false },
-                      { type: 'General Liability', range: '$500–$1.5k/yr', desc: 'Slip/fall at customer sites.', req: false },
+                      { type: 'Primary Liability', range: '$5k–$12k/yr', desc: '$750k–$1M coverage. Required by FMCSA.', req: true, canCut: false },
+                      { type: 'Cargo Insurance', range: '$1.5k–$3k/yr', desc: '$100k cargo coverage. Required by brokers.', req: true, canCut: false },
+                      { type: 'Physical Damage', range: '$4k–$8k/yr', desc: 'Covers YOUR truck. CAN DROP since truck is paid off!', req: false, canCut: true },
+                      { type: 'Bobtail / NTL', range: '$400–$800/yr', desc: 'Driving without trailer coverage.', req: true, canCut: false },
+                      { type: 'Occupational Accident', range: '$1.5k–$3k/yr', desc: 'Workers comp for 1099 drivers.', req: false, canCut: true },
+                      { type: 'General Liability', range: '$500–$1.5k/yr', desc: 'Slip/fall at customer sites.', req: false, canCut: true },
                     ].map((ins, i) => (
-                      <div key={i} style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: `1px solid ${ins.req ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+                      <div key={i} style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: `1px solid ${ins.canCut ? 'rgba(16,185,129,0.3)' : ins.req ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '0.7rem' }}>{ins.type}</span>
                           <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '0.65rem' }}>{ins.range}</span>
                         </div>
                         <div className="text-secondary" style={{ fontSize: '0.6rem', lineHeight: '1.3' }}>{ins.desc}</div>
                         {ins.req && <div style={{ fontSize: '0.5rem', color: 'var(--danger)', marginTop: '0.15rem', fontWeight: 700 }}>⚠ REQUIRED</div>}
+                        {ins.canCut && <div style={{ fontSize: '0.5rem', color: 'var(--success)', marginTop: '0.15rem', fontWeight: 700 }}>✂ CAN REDUCE/DROP</div>}
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.65rem', padding: '0.4rem 0.6rem', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.15)' }}>
-                    <strong style={{ color: 'var(--success)' }}>💡 Save:</strong> Shop 3+ agencies (Progressive Commercial, OOIDA, Canal). Bundle for 10–20% off. Raise deductible to $2,500.
+                  <div style={{ marginTop: '0.6rem', fontSize: '0.65rem' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '0.35rem' }}>💡 Savings Plan (truck owned outright):</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                      <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>1. Drop Physical Damage</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Self-insure the truck since you own it. Set aside the premium ($400-650/mo) in a repair fund instead.</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>Save: $4,000–$8,000/yr</div>
+                      </div>
+                      <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>2. Raise Deductibles</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Go from $1,000 → $2,500 or $5,000 deductible. Lower premium 15-25%.</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>Save: $1,500–$3,000/yr</div>
+                      </div>
+                      <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>3. Shop 3+ Agencies</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Progressive Commercial, OOIDA, Canal, CoverWhale, Sentry. Each quotes different.</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>Save: $2,000–$5,000/yr</div>
+                      </div>
+                      <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div style={{ fontWeight: 700 }}>4. Clean Record Discount</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>2+ years no accidents/tickets? Ask for safe driver discount (~10%). ELD data helps.</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: '0.15rem' }}>Save: $1,000–$2,500/yr</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: 'rgba(16,185,129,0.1)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.25)' }}>
+                      <strong style={{ color: 'var(--success)' }}>🎯 Realistic Target: $1,400–$1,800/mo</strong> (down from $2,400). That's <strong>$7,200–$12,000/yr</strong> back in your pocket.
+                    </div>
                   </div>
                 </div>
 
