@@ -446,6 +446,25 @@ function App() {
               <p className="text-secondary mt-1">2023 Freightliner Cascadia · 290k mi · {analysis.totalMiles.toLocaleString()} mi this cycle · {totalDeadhead} mi deadhead</p>
             </header>
 
+            {/* Pending Trips Banner */}
+            {(() => {
+              const pending = incomes.filter(i => isFutureTrip(i.date));
+              return pending.length > 0 ? (
+                <div style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <CalendarDays size={20} style={{ color: '#eab308', marginTop: '0.1rem', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: '#eab308', fontSize: '0.85rem', marginBottom: '0.35rem' }}>⏳ {pending.length} Pending Trip{pending.length > 1 ? 's' : ''}</div>
+                    {pending.map(t => (
+                      <div key={t.id} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.15rem' }}>
+                        <span><strong style={{ color: 'var(--text-primary)' }}>{t.originCity?.split(',')[0]} → {t.destCity?.split(',')[0]}</strong> · {t.date}</span>
+                        <span className="text-success" style={{ fontWeight: 700 }}>{formatCurrency(t.totalPayout)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             {/* Row 1: Big Picture */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
