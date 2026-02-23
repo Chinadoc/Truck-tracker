@@ -548,28 +548,22 @@ function App() {
 
             {/* ★ Loads-to-Goal Calculator — Top of Dashboard */}
             {(() => {
-              // Business costs already deducted from revenue
-              const bizCosts = totalExpenses + analysis.totalHiddenCosts; // fuel + deadhead + reserves
-              const monthlyFixed = 2400 + 600 + 250 + 100 + 133.33; // insurance+trailer+tolls+lockbox+reg
-              const monthlyTax = analysis.estimatedTax > 0 ? analysis.estimatedTax : (totalIncome * TOTAL_TAX_RATE);
-              const totalBizBurn = bizCosts + monthlyFixed + monthlyTax;
+              // Use the same True Net Profit the dashboard shows
+              const trueNetProfit = analysis.ownerOperatorTrueProfit; // revenue - fuel - deadhead - depreciation - maint
 
-              // What's LEFT after all business costs = money for you
-              const netAfterBiz = totalIncome - totalBizBurn;
-
-              // Personal obligations (what you need to live + debt)
+              // What you need to take home
               const monthlyPersonal = totalPersonalMonthly;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const takeHomeNeed = monthlyPersonal + debtPayment;
 
               // How much of take-home is covered?
-              const takeHomeCovered = Math.max(0, netAfterBiz);
+              const takeHomeCovered = Math.max(0, trueNetProfit);
               const shortfall = Math.max(0, takeHomeNeed - takeHomeCovered);
               const pctCovered = takeHomeNeed > 0 ? Math.min(100, (takeHomeCovered / takeHomeNeed) * 100) : 100;
               const goalMet = takeHomeCovered >= takeHomeNeed;
 
               // Loads needed to close the gap
-              const avgTripNet = completedIncomes.length > 0 ? netAfterBiz / completedIncomes.length : 500;
+              const avgTripNet = completedIncomes.length > 0 ? trueNetProfit / completedIncomes.length : 500;
               const loadsLeft = shortfall > 0 && avgTripNet > 0 ? Math.ceil(shortfall / Math.max(avgTripNet, 200)) : 0;
               const daysLeft = loadsLeft * 2;
 
@@ -585,7 +579,7 @@ function App() {
                     {goalMet ? '✅' : '🎯'} {goalMet ? 'Take-Home Goals Met!' : 'Loads to Cover Your Nut'}
                   </h3>
                   <div className="text-secondary" style={{ fontSize: '0.6rem', marginBottom: '0.6rem' }}>
-                    Revenue ({formatCurrency(totalIncome)}) − Business Costs ({formatCurrency(totalBizBurn)}) = <strong style={{ color: netAfterBiz >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(netAfterBiz)}</strong> available for you
+                    Net Profit ({formatCurrency(trueNetProfit)}) vs Take-Home Need ({formatCurrency(takeHomeNeed)}) = <strong style={{ color: trueNetProfit >= takeHomeNeed ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit - takeHomeNeed)}</strong>
                   </div>
 
                   {/* Progress bar — personal + debt */}
