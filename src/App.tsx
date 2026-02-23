@@ -432,9 +432,8 @@ function App() {
   const getTripDuration = (dep?: string, arr?: string) => {
     if (!dep || !arr) return null;
     const ms = new Date(arr).getTime() - new Date(dep).getTime();
-    const hrs = Math.floor(ms / 3600000);
-    const mins = Math.round((ms % 3600000) / 60000);
-    return `${hrs}h ${mins}m`;
+    const hrs = Math.round(ms / 3600000);
+    return `${hrs}h`;
   };
 
   // Manifest upload handler (CSV: date,origin,destination,miles,pay,broker)
@@ -927,11 +926,17 @@ function App() {
                               <td>
                                 {isEditing ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => handleEditTrip(inc.id, 'date', e.target.value)} />
+                                    <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => {
+                                      handleEditTrip(inc.id, 'date', e.target.value);
+                                      // Auto-set pickup to date@06:00 if no departure set
+                                      if (!inc.departureTime && e.target.value) {
+                                        handleEditTrip(inc.id, 'departureTime', `${e.target.value}T06:00`);
+                                      }
+                                    }} />
                                     <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700, marginTop: '0.15rem' }}>PICKUP</div>
-                                    <input type="datetime-local" defaultValue={inc.departureTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'departureTime', e.target.value)} />
+                                    <input type="datetime-local" step="3600" defaultValue={inc.departureTime ?? (inc.date ? `${inc.date}T06:00` : '')} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'departureTime', e.target.value)} />
                                     <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700 }}>DROP-OFF</div>
-                                    <input type="datetime-local" defaultValue={inc.arrivalTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'arrivalTime', e.target.value)} />
+                                    <input type="datetime-local" step="3600" defaultValue={inc.arrivalTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'arrivalTime', e.target.value)} />
                                   </div>
                                 ) : (
                                   <>
@@ -1289,6 +1294,108 @@ function App() {
                   ))}
                 </div>
               </div>
+
+              {/* Cost Reduction Strategies */}
+              <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #3b82f6' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>💡 Cost Reduction Strategies</h3>
+
+                {/* Trailer: Rent vs Buy */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🚛 Trailer: Rent vs Buy</h4>
+                  <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', fontSize: '0.75rem' }}>
+                    <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '0.35rem', color: 'var(--danger)' }}>Current: Rent Dry Van</div>
+                      <div>$600/mo × 12 = <strong>$7,200/yr</strong></div>
+                      <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>No maintenance cost, swap easily. But never build equity.</div>
+                    </div>
+                    <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '0.35rem', color: 'var(--success)' }}>Buy Used Dry Van</div>
+                      <div>$15k–$25k ≈ <strong>$350–500/mo</strong></div>
+                      <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>5yr finance @ 7%. Own it after. Budget $1k/yr tires, $500/yr brakes.</div>
+                      <div style={{ color: 'var(--success)', fontSize: '0.65rem', fontWeight: 700, marginTop: '0.35rem' }}>Save ~$100–250/mo vs renting</div>
+                    </div>
+                    <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '0.35rem', color: '#3b82f6' }}>Flatbed Option</div>
+                      <div>$10k–$18k used, <strong>$250–400/mo</strong></div>
+                      <div className="text-secondary" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>Higher $/mi ($2.50–$3.50) but requires tarps, chains ($1.5k startup). More physical.</div>
+                      <div style={{ color: '#3b82f6', fontSize: '0.65rem', fontWeight: 700, marginTop: '0.35rem' }}>+$0.30–0.50/mi higher rates</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lock Box */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🔒 Lock Box: Rent vs Own</h4>
+                  <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.75rem' }}>
+                    <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--danger)' }}>Current: Rent @ $100/mo</div>
+                      <div>$1,200/year ongoing forever</div>
+                    </div>
+                    <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--success)' }}>Buy: $300–$600 one-time</div>
+                      <div>Pays for itself in 3–6 months. <strong>Save $600–900/yr.</strong></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Insurance Breakdown */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🛡 Insurance Breakdown — $2,400/mo Bundle</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '0.5rem', fontSize: '0.7rem' }}>
+                    {[
+                      { type: 'Primary Liability', range: '$5k–$12k/yr', desc: '$750k–$1M coverage. Required by FMCSA.', req: true },
+                      { type: 'Cargo Insurance', range: '$1.5k–$3k/yr', desc: '$100k cargo coverage. Required by brokers.', req: true },
+                      { type: 'Physical Damage', range: '$4k–$8k/yr', desc: 'Covers YOUR truck. Can drop if paid off.', req: false },
+                      { type: 'Bobtail / NTL', range: '$400–$800/yr', desc: 'Driving without trailer coverage.', req: true },
+                      { type: 'Occupational Accident', range: '$1.5k–$3k/yr', desc: "Workers comp for 1099 drivers.", req: false },
+                      { type: 'General Liability', range: '$500–$1.5k/yr', desc: 'Slip/fall at customer sites.', req: false },
+                    ].map((ins, i) => (
+                      <div key={i} style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.5rem', border: `1px solid ${ins.req ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.7rem' }}>{ins.type}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '0.65rem' }}>{ins.range}</span>
+                        </div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem', lineHeight: '1.3' }}>{ins.desc}</div>
+                        {ins.req && <div style={{ fontSize: '0.5rem', color: 'var(--danger)', marginTop: '0.15rem', fontWeight: 700 }}>⚠ REQUIRED</div>}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.65rem', padding: '0.4rem 0.6rem', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <strong style={{ color: 'var(--success)' }}>💡 Save:</strong> Shop 3+ agencies (Progressive Commercial, OOIDA, Canal). Bundle for 10–20% off. Raise deductible to $2,500.
+                  </div>
+                </div>
+
+                {/* Tire Specs */}
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.6rem' }}>🔧 Tires — 2023 Cascadia (295/75R22.5, 18 total)</h4>
+                  <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', fontSize: '0.7rem' }}>
+                    {[
+                      { pos: '🟢 Steer (2)', brand: 'Michelin XZA3+', cost: '$380–$420 ea', life: '120k–150k mi', total: '$760–$840', note: 'Premium steer. Best grip. Worth the money on front axle.' },
+                      { pos: '🟡 Drive (8)', brand: 'Continental HDL2', cost: '$280–$350 ea', life: '100k–130k mi', total: '$2,240–$2,800', note: 'Aggressive tread. Can retread 1–2× ($120/tire) to save.' },
+                      { pos: '🔵 Trailer (8)', brand: 'Firestone FT492', cost: '$180–$220 ea', life: '80k–100k mi', total: '$1,440–$1,760', note: 'Budget OK here. Low-roll resistance saves fuel.' },
+                    ].map((t, i) => (
+                      <div key={i} style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0.6rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>{t.pos}</div>
+                        <div style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.65rem' }}>{t.brand}</div>
+                        <div style={{ marginTop: '0.15rem' }}>{t.cost} · <span className="text-secondary">{t.life}</span></div>
+                        <div style={{ fontWeight: 700, color: 'var(--danger)', marginTop: '0.1rem' }}>Set: {t.total}</div>
+                        <div className="text-secondary" style={{ fontSize: '0.55rem', marginTop: '0.15rem' }}>{t.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid-2" style={{ marginTop: '0.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.7rem' }}>
+                    <div style={{ background: 'rgba(239,68,68,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontWeight: 700 }}>Full New Set (18)</div>
+                      <div className="text-danger" style={{ fontWeight: 800 }}>$4,440–$5,400</div>
+                    </div>
+                    <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.5rem', border: '1px solid rgba(16,185,129,0.15)' }}>
+                      <div style={{ fontWeight: 700 }}>With Retreads</div>
+                      <div style={{ fontWeight: 800, color: 'var(--success)' }}>$2,680–$3,360 · Save $1,500+</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           );
         })()}
