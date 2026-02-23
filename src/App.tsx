@@ -13,7 +13,9 @@ import {
   Scale,
   MapPin,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload,
+  Clock
 } from 'lucide-react';
 import {
   BarChart,
@@ -42,24 +44,46 @@ L.Icon.Default.mergeOptions({
 const COMPANY_DRIVER_RATE = 0.65;
 const VEHICLE_VALUE = 85000;
 const THREE_YEAR_MILES = 360000;
-const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES; // ~$0.236/mi
-const CASCADIA_MAINT_RESERVE = 0.15; // $0.15/mi
-const MPG = 6.5; // 2023 Cascadia avg
+const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
+const CASCADIA_MAINT_RESERVE = 0.15;
+const MPG = 6.5;
 
-// Regional diesel prices by area ($/gal, Feb 2026 estimates)
+// Regional diesel prices ($/gal, Feb 2026 estimates)
 const REGIONAL_DIESEL: Record<string, { price: number; label: string }> = {
   'UT': { price: 3.80, label: 'Utah ($3.80/gal)' },
   'TX': { price: 3.40, label: 'Texas ($3.40/gal)' },
   'OH': { price: 3.60, label: 'Midwest/OH ($3.60/gal)' },
   'NV': { price: 4.10, label: 'Nevada ($4.10/gal)' },
   'CA': { price: 5.20, label: 'California ($5.20/gal)' },
+  'PA': { price: 4.05, label: 'Pennsylvania ($4.05/gal)' },
+  'NM': { price: 3.65, label: 'New Mexico ($3.65/gal)' },
+  'AZ': { price: 3.75, label: 'Arizona ($3.75/gal)' },
+  'CO': { price: 3.70, label: 'Colorado ($3.70/gal)' },
+  'OK': { price: 3.35, label: 'Oklahoma ($3.35/gal)' },
+  'AR': { price: 3.40, label: 'Arkansas ($3.40/gal)' },
+  'TN': { price: 3.45, label: 'Tennessee ($3.45/gal)' },
+  'IN': { price: 3.55, label: 'Indiana ($3.55/gal)' },
+  'WV': { price: 3.70, label: 'West Virginia ($3.70/gal)' },
   'AVG': { price: 3.85, label: 'National Avg ($3.85/gal)' },
 };
 
-// Fuel cost helper — cost for miles in a region
-const fuelCostForMiles = (miles: number, region: string) => {
-  const price = REGIONAL_DIESEL[region]?.price ?? REGIONAL_DIESEL['AVG'].price;
-  return (miles / MPG) * price;
+// Midpoint region mapping for multi-region fuel averaging
+const ROUTE_MIDPOINTS: Record<string, string> = {
+  'UT-TX': 'NM', 'TX-OH': 'TN', 'OH-NV': 'CO', 'NV-CA': 'NV',
+  'CA-TX': 'AZ', 'TX-TX': 'TX', 'TX-PA': 'TN', 'TX-NV': 'NM',
+  'OH-TX': 'TN', 'PA-TX': 'TN', 'NV-TX': 'NM',
+};
+
+// Fuel cost — averages origin, midpoint, and destination prices
+const fuelCostForMiles = (miles: number, originRegion: string, destRegion?: string) => {
+  const oPrice = REGIONAL_DIESEL[originRegion]?.price ?? REGIONAL_DIESEL['AVG'].price;
+  if (!destRegion) return (miles / MPG) * oPrice;
+  const dPrice = REGIONAL_DIESEL[destRegion]?.price ?? REGIONAL_DIESEL['AVG'].price;
+  const midKey = `${originRegion}-${destRegion}`;
+  const midRegion = ROUTE_MIDPOINTS[midKey] ?? 'AVG';
+  const mPrice = REGIONAL_DIESEL[midRegion]?.price ?? REGIONAL_DIESEL['AVG'].price;
+  const avgPrice = (oPrice + mPrice + dPrice) / 3;
+  return (miles / MPG) * avgPrice;
 };
 
 // === TYPES ===
@@ -73,17 +97,20 @@ type Income = {
   totalPayout: number;
   originCity?: string;
   destCity?: string;
-  originCoords?: [number, number]; // [lat, lng]
+  originCoords?: [number, number];
   destCoords?: [number, number];
   fuelRegion?: string;
+  destFuelRegion?: string;
   deadheadMiles?: number;
   deadheadFrom?: string;
+  departureTime?: string;
+  arrivalTime?: string;
 };
 
 type Expense = {
   id: string;
   date: string;
-  category: 'Fuel' | 'Maintenance' | 'Insurance' | 'Tolls' | 'Other' | 'Deadhead';
+  category: 'Fuel' | 'Maintenance' | 'Insurance' | 'Tolls' | 'Other' | 'Deadhead' | 'Permits' | 'Truck Payment' | 'Parking' | 'ELD' | 'Lumper' | 'IFTA';
   description: string;
   amount: number;
 };
@@ -96,7 +123,8 @@ const INITIAL_TRIPS: Income[] = [
     distance: 1330, ratePerMile: 2700 / 1330, totalPayout: 2700,
     originCity: 'Salt Lake City, UT', destCity: 'Austin, TX',
     originCoords: [40.7608, -111.8910], destCoords: [30.2672, -97.7431],
-    fuelRegion: 'UT',
+    fuelRegion: 'UT', destFuelRegion: 'TX',
+    departureTime: '2026-02-15T06:00', arrivalTime: '2026-02-16T18:00',
   },
   {
     id: 't2', date: '2026-02-17',
@@ -104,7 +132,9 @@ const INITIAL_TRIPS: Income[] = [
     distance: 1200, ratePerMile: 2200 / 1200, totalPayout: 2200,
     originCity: 'Temple, TX', destCity: 'Marengo, OH',
     originCoords: [31.0982, -97.3428], destCoords: [40.4006, -81.4468],
-    fuelRegion: 'TX', deadheadMiles: 70, deadheadFrom: 'Austin, TX → Temple, TX',
+    fuelRegion: 'TX', destFuelRegion: 'OH',
+    deadheadMiles: 70, deadheadFrom: 'Austin, TX → Temple, TX',
+    departureTime: '2026-02-17T05:00', arrivalTime: '2026-02-18T20:00',
   },
   {
     id: 't3', date: '2026-02-19',
@@ -112,7 +142,9 @@ const INITIAL_TRIPS: Income[] = [
     distance: 2000, ratePerMile: 4000 / 2000, totalPayout: 4000,
     originCity: 'Ashland, OH 44805', destCity: 'Las Vegas, NV 89139',
     originCoords: [40.8687, -82.3182], destCoords: [36.1699, -115.1398],
-    fuelRegion: 'OH', deadheadMiles: 20, deadheadFrom: 'Marengo → Ashland, OH',
+    fuelRegion: 'OH', destFuelRegion: 'NV',
+    deadheadMiles: 20, deadheadFrom: 'Marengo → Ashland, OH',
+    departureTime: '2026-02-19T04:00', arrivalTime: '2026-02-21T14:00',
   },
   {
     id: 't4', date: '2026-02-22',
@@ -120,7 +152,8 @@ const INITIAL_TRIPS: Income[] = [
     distance: 275, ratePerMile: 700 / 275, totalPayout: 700,
     originCity: 'Las Vegas, NV 89139', destCity: 'La Mirada, CA 90631',
     originCoords: [36.1699, -115.1398], destCoords: [33.9172, -118.0120],
-    fuelRegion: 'NV',
+    fuelRegion: 'NV', destFuelRegion: 'CA',
+    departureTime: '2026-02-22T07:00', arrivalTime: '2026-02-22T12:00',
   },
   {
     id: 't5', date: '2026-02-23',
@@ -128,7 +161,9 @@ const INITIAL_TRIPS: Income[] = [
     distance: 1435, ratePerMile: 3050 / 1435, totalPayout: 3050,
     originCity: 'Walnut, CA 91789', destCity: 'Grand Prairie, TX 75050',
     originCoords: [34.0203, -117.8654], destCoords: [32.7460, -96.9978],
-    fuelRegion: 'CA', deadheadMiles: 5, deadheadFrom: 'La Mirada → Walnut, CA',
+    fuelRegion: 'CA', destFuelRegion: 'TX',
+    deadheadMiles: 5, deadheadFrom: 'La Mirada → Walnut, CA',
+    departureTime: '2026-02-23T03:00', arrivalTime: '2026-02-24T22:00',
   },
   {
     id: 't6', date: '2026-02-25',
@@ -136,38 +171,44 @@ const INITIAL_TRIPS: Income[] = [
     distance: 250, ratePerMile: 700 / 250, totalPayout: 700,
     originCity: 'Fort Worth, TX 76137', destCity: 'Houston, TX 77038',
     originCoords: [32.7555, -97.3308], destCoords: [29.8543, -95.4147],
-    fuelRegion: 'TX', deadheadMiles: 15, deadheadFrom: 'Grand Prairie → Fort Worth, TX',
+    fuelRegion: 'TX', destFuelRegion: 'TX',
+    deadheadMiles: 15, deadheadFrom: 'Grand Prairie → Fort Worth, TX',
+    departureTime: '2026-02-25T06:00', arrivalTime: '2026-02-25T10:30',
+  },
+  {
+    id: 't7', date: '2026-02-27',
+    loadId: 'RSB-EST-007', broker: 'Spot Market',
+    distance: 1620, ratePerMile: 3400 / 1620, totalPayout: 3400,
+    originCity: 'Rosenberg, TX 77471', destCity: 'Easton, PA 18040',
+    originCoords: [29.5569, -95.8088], destCoords: [40.6910, -75.2207],
+    fuelRegion: 'TX', destFuelRegion: 'PA',
+    deadheadMiles: 35, deadheadFrom: 'Houston 77038 → Rosenberg, TX',
+    departureTime: '2026-02-27T04:00', arrivalTime: '2026-03-01T08:00',
   },
 ];
 
 // Build fuel + deadhead expenses from trip data
 const buildExpenses = (): Expense[] => {
-  const expenses: Expense[] = [];
+  const exps: Expense[] = [];
   INITIAL_TRIPS.forEach(trip => {
-    // Fuel expense for this trip
-    const fuelCost = fuelCostForMiles(trip.distance, trip.fuelRegion ?? 'AVG');
-    const regionLabel = REGIONAL_DIESEL[trip.fuelRegion ?? 'AVG']?.label ?? 'Avg';
-    expenses.push({
-      id: `fuel-${trip.id}`,
-      date: trip.date,
-      category: 'Fuel',
-      description: `Fuel: ${trip.originCity} → ${trip.destCity} (${regionLabel})`,
+    const fuelCost = fuelCostForMiles(trip.distance, trip.fuelRegion ?? 'AVG', trip.destFuelRegion);
+    const oLabel = REGIONAL_DIESEL[trip.fuelRegion ?? 'AVG']?.label ?? '';
+    const dLabel = trip.destFuelRegion ? REGIONAL_DIESEL[trip.destFuelRegion]?.label ?? '' : '';
+    exps.push({
+      id: `fuel-${trip.id}`, date: trip.date, category: 'Fuel',
+      description: `Fuel: ${trip.originCity} → ${trip.destCity} (avg: ${oLabel.split('(')[0]}→ ${dLabel.split('(')[0]})`,
       amount: Math.round(fuelCost * 100) / 100,
     });
-
-    // Deadhead expense
     if (trip.deadheadMiles && trip.deadheadMiles > 0) {
       const dhFuel = fuelCostForMiles(trip.deadheadMiles, trip.fuelRegion ?? 'AVG');
-      expenses.push({
-        id: `dh-${trip.id}`,
-        date: trip.date,
-        category: 'Deadhead',
+      exps.push({
+        id: `dh-${trip.id}`, date: trip.date, category: 'Deadhead',
         description: `Deadhead (empty): ${trip.deadheadFrom} (${trip.deadheadMiles} mi)`,
         amount: Math.round(dhFuel * 100) / 100,
       });
     }
   });
-  return expenses;
+  return exps;
 };
 
 const INITIAL_EXPENSES: Expense[] = buildExpenses();
@@ -178,6 +219,7 @@ function App() {
   const [incomes, setIncomes] = useState<Income[]>(INITIAL_TRIPS);
   const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+  const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
 
@@ -254,6 +296,48 @@ function App() {
 
   // Per-trip cost detail
   const getTripExpenses = (tripId: string) => expenses.filter(e => e.id.includes(tripId));
+
+  // Duration helper
+  const getTripDuration = (dep?: string, arr?: string) => {
+    if (!dep || !arr) return null;
+    const ms = new Date(arr).getTime() - new Date(dep).getTime();
+    const hrs = Math.floor(ms / 3600000);
+    const mins = Math.round((ms % 3600000) / 60000);
+    return `${hrs}h ${mins}m`;
+  };
+
+  // Manifest upload handler (CSV: date,origin,destination,miles,pay,broker)
+  const handleManifestUpload = (text: string) => {
+    const lines = text.trim().split('\n').filter(l => l.trim() && !l.startsWith('date'));
+    const newTrips: Income[] = [];
+    const newExps: Expense[] = [];
+    lines.forEach(line => {
+      const parts = line.split(',').map(s => s.trim());
+      if (parts.length < 5) return;
+      const [date, origin, dest, milesStr, payStr, broker] = parts;
+      const miles = Number(milesStr);
+      const pay = Number(payStr);
+      if (!miles || !pay) return;
+      const id = uuidv4();
+      newTrips.push({
+        id, date: date || new Date().toISOString().split('T')[0],
+        loadId: `MAN-${id.slice(0, 4).toUpperCase()}`, broker: broker || 'Manifest Import',
+        distance: miles, ratePerMile: pay / miles, totalPayout: pay,
+        originCity: origin, destCity: dest,
+      });
+      const fuel = fuelCostForMiles(miles, 'AVG');
+      newExps.push({
+        id: `fuel-${id}`, date: date || new Date().toISOString().split('T')[0],
+        category: 'Fuel', description: `Fuel: ${origin} → ${dest} (avg estimate)`,
+        amount: Math.round(fuel * 100) / 100,
+      });
+    });
+    if (newTrips.length) {
+      setIncomes(prev => [...prev, ...newTrips].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setExpenses(prev => [...prev, ...newExps].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setIsManifestModalOpen(false);
+    }
+  };
 
   return (
     <div className="app-container">
@@ -412,7 +496,10 @@ function App() {
                 <h1 className="text-3xl font-bold">Income & Loads</h1>
                 <p className="text-secondary mt-2">Click a trip to see per-trip cost breakdown</p>
               </div>
-              <button className="btn-primary flex items-center gap-2" onClick={() => setIsIncomeModalOpen(true)}><Plus size={18} /> Add Load</button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--accent)', padding: '0.75rem 1.25rem', borderRadius: '8px', fontWeight: 600, border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => setIsManifestModalOpen(true)}><Upload size={18} /> Upload Manifest</button>
+                <button className="btn-primary flex items-center gap-2" onClick={() => setIsIncomeModalOpen(true)}><Plus size={18} /> Add Load</button>
+              </div>
             </header>
 
             <div className="glass-panel p-0 overflow-hidden">
@@ -445,7 +532,10 @@ function App() {
                         return (
                           <React.Fragment key={inc.id}>
                             <tr onClick={() => setExpandedTrip(isExpanded ? null : inc.id)} style={{ cursor: 'pointer' }}>
-                              <td>{inc.date}</td>
+                              <td>
+                                <div>{inc.date}</div>
+                                {inc.departureTime && inc.arrivalTime ? <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}><Clock size={10} /> {getTripDuration(inc.departureTime, inc.arrivalTime)}</div> : null}
+                              </td>
                               <td>
                                 <div className="font-medium text-accent">{inc.originCity}</div>
                                 <div className="text-secondary" style={{ fontSize: '0.75rem' }}>→ {inc.destCity}</div>
@@ -468,9 +558,17 @@ function App() {
                                 <td colSpan={8} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem 1.5rem' }}>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
                                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Fuel Region</div>
+                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Fuel Region (3-pt avg)</div>
                                       <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{regionInfo?.label ?? 'N/A'}</div>
+                                      {inc.destFuelRegion ? <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>→ {REGIONAL_DIESEL[inc.destFuelRegion]?.label ?? ''}</div> : null}
                                     </div>
+                                    {inc.departureTime && inc.arrivalTime ? (
+                                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)' }}>
+                                        <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700 }}>Drive Time</div>
+                                        <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{getTripDuration(inc.departureTime, inc.arrivalTime)}</div>
+                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>{new Date(inc.departureTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} → {new Date(inc.arrivalTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                                      </div>
+                                    ) : null}
                                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
                                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Fuel Cost</div>
                                       <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(tripFuel)}</div>
@@ -645,6 +743,12 @@ function App() {
                     <option value="Maintenance">Maintenance & Repairs</option>
                     <option value="Insurance">Insurance</option>
                     <option value="Tolls">Tolls & Scales</option>
+                    <option value="Truck Payment">Truck Payment</option>
+                    <option value="Permits">Permits & Licensing</option>
+                    <option value="Parking">Parking & Rest Stops</option>
+                    <option value="ELD">ELD / Subscriptions</option>
+                    <option value="Lumper">Lumper Fees</option>
+                    <option value="IFTA">IFTA / Fuel Tax</option>
                     <option value="Other">Other Operational</option>
                   </select>
                 </div>
@@ -653,6 +757,25 @@ function App() {
               <div className="form-group"><label>Amount ($)</label><input type="number" step="0.01" min="0" name="amount" required placeholder="450.00" /></div>
               <div className="form-actions"><button type="button" className="btn-icon" onClick={() => setIsExpenseModalOpen(false)}>Cancel</button><button type="submit" className="btn-primary">Save Expense</button></div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manifest Upload Modal */}
+      {isManifestModalOpen && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setIsManifestModalOpen(false)}>
+          <div className="modal animate-scale-in" style={{ maxWidth: '600px' }}>
+            <div className="modal-header"><h2 className="modal-title">Upload Manifest / CSV</h2><button className="btn-icon" onClick={() => setIsManifestModalOpen(false)}><X size={20} /></button></div>
+            <p className="text-secondary" style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>Paste CSV data or upload a .csv file. Format: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.8rem' }}>date,origin,destination,miles,pay,broker</code></p>
+            <textarea id="manifest-text" rows={8} placeholder={`2026-03-01,Houston TX,Dallas TX,240,650,TQL\n2026-03-03,Dallas TX,Denver CO,790,1800,CH Robinson`} style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}></textarea>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Upload size={16} /> Or upload .csv
+                <input type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = (ev) => handleManifestUpload(ev.target?.result as string); r.readAsText(f); } }} />
+              </label>
+              <div style={{ flex: 1 }}></div>
+              <button className="btn-primary" onClick={() => { const el = document.getElementById('manifest-text') as HTMLTextAreaElement; if (el?.value) handleManifestUpload(el.value); }}>Import Trips</button>
+            </div>
           </div>
         </div>
       )}
