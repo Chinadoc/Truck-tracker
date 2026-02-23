@@ -1208,16 +1208,32 @@ function App() {
                         );
                       })}
                       {/* Monthly Totals Row */}
-                      <tr style={{ background: 'rgba(59,130,246,0.08)', borderTop: '2px solid var(--accent)', fontWeight: 700 }}>
-                        <td style={{ fontSize: '0.8rem' }}>Total / ټول</td>
-                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{incomes.length} trips / سفرونه</td>
-                        <td>{totalMiles.toLocaleString()}</td>
-                        <td>{formatCurrency(totalMiles > 0 ? totalIncome / totalMiles : 0)}</td>
-                        <td className="text-success">{formatCurrency(totalIncome)}</td>
-                        <td className="text-danger">{formatCurrency(completedExpenses.filter(e => e.category === 'Fuel' || e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0))}</td>
-                        <td style={{ color: analysis.ownerOperatorTrueProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.ownerOperatorTrueProfit)}</td>
-                        <td></td>
-                      </tr>
+                      {(() => {
+                        const allMiles = incomes.reduce((s, i) => s + i.distance, 0);
+                        const allPayout = incomes.reduce((s, i) => s + i.totalPayout, 0);
+                        const allFuelDH = incomes.reduce((s, i) => {
+                          const te = getTripExpenses(i.id);
+                          return s + te.filter(e => e.category === 'Fuel' || e.category === 'Deadhead').reduce((ss, e) => ss + e.amount, 0);
+                        }, 0);
+                        const allNet = incomes.reduce((s, i) => {
+                          const te = getTripExpenses(i.id);
+                          const fuel = te.filter(e => e.category === 'Fuel').reduce((ss, e) => ss + e.amount, 0);
+                          const dh = te.filter(e => e.category === 'Deadhead').reduce((ss, e) => ss + e.amount, 0);
+                          return s + (i.totalPayout - fuel - dh - i.distance * CASCADIA_DEPR_RATE - i.distance * CASCADIA_MAINT_RESERVE - i.totalPayout * 0.10);
+                        }, 0);
+                        return (
+                          <tr style={{ background: 'rgba(59,130,246,0.08)', borderTop: '2px solid var(--accent)', fontWeight: 700 }}>
+                            <td style={{ fontSize: '0.8rem' }}>Total / ټول</td>
+                            <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{incomes.length} trips / سفرونه</td>
+                            <td>{allMiles.toLocaleString()}</td>
+                            <td>{formatCurrency(allMiles > 0 ? allPayout / allMiles : 0)}</td>
+                            <td className="text-success">{formatCurrency(allPayout)}</td>
+                            <td className="text-danger">{formatCurrency(allFuelDH)}</td>
+                            <td style={{ color: allNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(allNet)}</td>
+                            <td></td>
+                          </tr>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 ) : (
