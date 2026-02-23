@@ -245,7 +245,7 @@ function App() {
               </div>
             </div>
 
-            {/* Trip Cycle Analysis */}
+            {/* Trip Cycle Analysis & Expense Buckets */}
             <div className="glass-panel p-6 mb-8">
               <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] pb-4">
                 <div>
@@ -254,7 +254,7 @@ function App() {
                     Trip Cycle Scenario: 2023 Freightliner Cascadia
                   </h3>
                   <p className="text-secondary mt-1 text-sm">
-                    Side-by-side comparison assuming 290k miles, depreciating over 3 remaining years
+                    Tracking real expenses against expected hidden costs (290k miles, 3 years remaining)
                   </p>
                 </div>
                 <div className={`px-4 py-2 rounded-full text-sm font-bold border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.1)] text-success border-success' : 'bg-[rgba(239,68,68,0.1)] text-danger border-danger'}`}>
@@ -262,72 +262,103 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4">
-                {/* Column 1: True Profit */}
-                <div className="flex flex-col gap-4">
-                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Owner-Operator (Side-By-Side)</p>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2">
-                      <span className="text-secondary">Gross Revenue (Total Miles):</span>
-                      <span className="font-bold text-base">{formatCurrency(totalIncome)}</span>
+              <div className="flex flex-col lg:flex-row gap-8">
+                {/* Left: 2/3 Width - Expected Expense Buckets */}
+                <div className="flex-1">
+                  <h4 className="font-bold mb-4 flex items-center gap-2 border-b border-[rgba(255,255,255,0.05)] pb-2 text-lg">
+                    <Wrench size={18} className="text-secondary" /> The "Savings Box" & Tracked Expenses
+                  </h4>
+
+                  {/* Bucket 1: Fuel */}
+                  <div className="bucket-container mt-4">
+                    <div className="bucket-header">
+                      <span>Diesel & DEF (Expected $0.55/mi)</span>
+                      <span>{formatCurrency(analysis.trackedFuelCost)} / {formatCurrency(analysis.expectedFuelCost)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2 text-danger opacity-90">
-                      <span>Given Cost: Tracked Fuel & Expenses:</span>
+                    <div className="bucket-bar-bg">
+                      <div
+                        className={`bucket-bar-fill ${analysis.trackedFuelCost > analysis.expectedFuelCost ? 'bg-danger' : 'bg-success'}`}
+                        style={{ width: `${Math.min(100, (analysis.trackedFuelCost / Math.max(1, analysis.expectedFuelCost)) * 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Bucket 2: Vehicle Depreciation */}
+                  <div className="bucket-container mt-4">
+                    <div className="bucket-header text-danger opacity-90">
+                      <span>Truck Depreciation (Hidden Cost)</span>
+                      <span>Target: {formatCurrency(analysis.vehicleDepreciation)}</span>
+                    </div>
+                    <div className="bucket-bar-bg">
+                      {/* This is a visual representation of a hidden cost you CAN'T avoid paying eventually  */}
+                      <div className="bucket-bar-fill bg-danger opacity-70" style={{ width: '100%' }}></div>
+                    </div>
+                  </div>
+
+                  {/* Bucket 3: Maintenance Reserve */}
+                  <div className="bucket-container mt-4 mb-6">
+                    <div className="bucket-header text-warning opacity-90" style={{ color: '#eab308' }}>
+                      <span>Maintenance & Tires Reserve</span>
+                      <span>Target: {formatCurrency(analysis.maintReserve)}</span>
+                    </div>
+                    <div className="bucket-bar-bg">
+                      <div className="bucket-bar-fill opacity-70" style={{ background: '#eab308', width: '100%' }}></div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-[var(--surface-hover)] rounded-xl border border-[var(--border)]">
+                    <div className="flex justify-between items-center text-sm font-bold">
+                      <span className="text-secondary uppercase">Gross Revenue (Total Miles):</span>
+                      <span className="text-lg">{formatCurrency(totalIncome)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mt-2 text-danger">
+                      <span className="opacity-80">Total Tracked Expenses:</span>
                       <span>-{formatCurrency(totalExpenses)}</span>
                     </div>
-
-                    <div className="bg-[rgba(0,0,0,0.2)] p-4 rounded-xl border border-[var(--border)] mb-2 mt-2">
-                      <p className="text-xs uppercase font-bold text-secondary mb-2 flex items-center gap-2">
-                        <Wrench size={14} /> The "Savings Box" (Likely Expenses)
-                      </p>
-                      <div className="flex justify-between items-center text-sm text-danger opacity-80 mb-1">
-                        <span>Vehicle Depr. (${CASCADIA_DEPR_RATE.toFixed(3)}/mi):</span>
-                        <span>-{formatCurrency(analysis.vehicleDepreciation)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm text-danger opacity-80">
-                        <span>Maintenance Reserve (${CASCADIA_MAINT_RESERVE.toFixed(2)}/mi):</span>
-                        <span>-{formatCurrency(analysis.maintReserve)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center text-lg font-bold pt-2">
-                      <span>True Profit (Net):</span>
-                      <span className="text-accent">{formatCurrency(analysis.ownerOperatorTrueProfit)}</span>
+                    <div className="flex justify-between items-center text-sm mt-1 text-danger">
+                      <span className="opacity-80">Total Hidden Shrinkage (Depr + Maint):</span>
+                      <span>-{formatCurrency(analysis.totalHiddenCosts)}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Column 2: Old Company Equivalent */}
-                <div className="bg-[rgba(0,0,0,0.2)] p-6 rounded-xl border border-[var(--border)] flex flex-col gap-4">
-                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Old Company Equivalent</p>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-secondary">Total Miles Analyzed:</span>
-                      <span className="font-bold text-base">{analysis.totalMiles.toLocaleString()} mi</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-secondary">Company Rate:</span>
-                      <span className="font-bold text-base">${COMPANY_DRIVER_RATE.toFixed(2)}/mi</span>
-                    </div>
-                    <div className="flex justify-between items-center text-lg font-bold pt-4 border-t border-[var(--border)]">
-                      <span className="text-secondary">Old Earnings:</span>
-                      <span>{formatCurrency(analysis.companyEquivalentEarnings)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                {/* Right: 1/3 Width - Head to Head Comparison */}
+                <div className="lg:w-1/3 flex flex-col gap-4">
+                  <h4 className="font-bold flex items-center gap-2 border-b border-[rgba(255,255,255,0.05)] pb-2 text-lg">
+                    <Scale size={18} className="text-accent" /> Head-to-Head
+                  </h4>
 
-              <div className="mt-6 p-4 bg-[var(--surface-hover)] rounded-xl border-l-4 border-accent flex items-start gap-4">
-                <div className="pt-1"><Scale size={24} className="text-accent" /></div>
-                <div>
-                  <h4 className="font-bold mb-1">Performance Details</h4>
-                  <p className="text-sm text-secondary mb-3">Comparing your actual recorded expenses versus the standard $0.65 margin.</p>
-                  <div className="flex gap-4 flex-wrap">
-                    <div className="bg-[rgba(0,0,0,0.3)] px-3 py-2 rounded-lg border border-[var(--border)]">
-                      <span className="text-xs uppercase text-secondary block mb-1">Net Gain vs Company</span>
-                      <span className={`font-semibold ${analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {/* Company Driver Box */}
+                  <div className="bg-[rgba(0,0,0,0.3)] p-5 rounded-xl border border-[var(--border)] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-2 opacity-10"><DollarSign size={48} /></div>
+                    <h5 className="text-xs uppercase font-bold text-secondary mb-3">Company Driver Rate</h5>
+                    <div className="text-3xl font-bold mb-1">{formatCurrency(analysis.companyEquivalentEarnings)}</div>
+                    <p className="text-sm text-secondary">guaranteed @ ${COMPANY_DRIVER_RATE.toFixed(2)}/mi</p>
+                    <p className="text-xs text-secondary mt-1">({analysis.totalMiles.toLocaleString()} total miles tracked)</p>
+                  </div>
+
+                  {/* VS Badge */}
+                  <div className="flex justify-center -my-2 relative z-10">
+                    <span className="bg-black text-secondary text-xs uppercase font-bold px-3 py-1 rounded-full border border-[var(--border)]">VS</span>
+                  </div>
+
+                  {/* Owner Operator True Net Box */}
+                  <div className={`p-5 rounded-xl border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.05)] border-success' : 'bg-[rgba(239,68,68,0.05)] border-danger'} relative overflow-hidden`}>
+                    <div className="absolute top-0 right-0 p-2 opacity-10"><Truck size={48} /></div>
+                    <h5 className="text-xs uppercase font-bold mb-3 flex items-center gap-2">
+                      <span className={analysis.isBeatingCompanyRate ? 'text-success' : 'text-danger'}>Owner Operator True Net</span>
+                    </h5>
+                    <div className={`text-3xl font-bold mb-1 ${analysis.isBeatingCompanyRate ? 'text-success' : 'text-danger'}`}>
+                      {formatCurrency(analysis.ownerOperatorTrueProfit)}
+                    </div>
+                    <p className="text-sm text-secondary">
+                      After tracking costs + hiding ${formatCurrency(analysis.totalHiddenCosts)} for reserves.
+                    </p>
+                    <div className="mt-4 pt-3 border-t border-[rgba(255,255,255,0.1)]">
+                      <div className="text-xs text-secondary uppercase font-bold mb-1">Difference</div>
+                      <div className={`text-lg font-bold ${analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'text-success' : 'text-danger'}`}>
                         {formatCurrency(analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings)}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 </div>
