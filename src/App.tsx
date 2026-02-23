@@ -166,6 +166,7 @@ const INITIAL_DEBTS: Debt[] = [
   { id: 'd3', to: 'Fellow Truck Driver', amount: 4000, dateBorrowed: '2024', notes: '' },
   { id: 'd4', to: 'Person #4', amount: 1000, dateBorrowed: '2024', notes: '' },
   { id: 'd5', to: 'Person #5', amount: 2000, dateBorrowed: '2024', notes: '' },
+  { id: 'd6', to: 'Credit Card', amount: 1000, dateBorrowed: '2025', notes: 'Revolving — high interest' },
 ];
 
 // === REAL TRIP DATA ===
@@ -282,7 +283,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 4;
+const DATA_VERSION = 5;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
@@ -844,12 +845,12 @@ function App() {
 
                       {/* Debt Payoff Progress */}
                       <div style={{ textAlign: 'center' }}>
-                        <CircleFill pct={totalDebt > 0 ? ((14500 - totalDebt) / 14500) * 100 : 100} color="#a855f7" size={80} icon="💳" />
+                        <CircleFill pct={totalDebt > 0 ? ((15500 - totalDebt) / 15500) * 100 : 100} color="#a855f7" size={80} icon="💳" />
                         <div style={{ fontWeight: 700, fontSize: '0.8rem', marginTop: '0.35rem' }}>Debt Freedom</div>
-                        <div style={{ fontWeight: 800, color: '#a855f7', fontSize: '0.9rem' }}>{formatCurrency(14500 - totalDebt)} paid</div>
+                        <div style={{ fontWeight: 800, color: '#a855f7', fontSize: '0.9rem' }}>{formatCurrency(15500 - totalDebt)} paid</div>
                         <div className="text-secondary" style={{ fontSize: '0.6rem' }}>{formatCurrency(totalDebt)} remaining</div>
                         <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '0.3rem', overflow: 'hidden' }}>
-                          <div style={{ width: `${Math.min(100, ((14500 - totalDebt) / 14500) * 100)}%`, height: '100%', background: '#a855f7', borderRadius: '2px', transition: 'width 2s ease-out' }} />
+                          <div style={{ width: `${Math.min(100, ((15500 - totalDebt) / 15500) * 100)}%`, height: '100%', background: '#a855f7', borderRadius: '2px', transition: 'width 2s ease-out' }} />
                         </div>
                         <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem' }}>~{Math.ceil(totalDebt / Math.max(1, debtPayment))} months to go</div>
                       </div>
@@ -1595,6 +1596,98 @@ function App() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Debt Payoff Plan */}
+            <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #a855f7' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', color: '#a855f7' }}>📅 Debt Payoff Plan — ${(1000).toLocaleString()}/mo</h3>
+
+              {/* Strategy comparison */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1rem', fontSize: '0.7rem' }}>
+                <div style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ fontWeight: 700, color: '#a855f7', marginBottom: '0.25rem' }}>❄️ Avalanche (Recommended)</div>
+                  <div>Pay highest-interest first.</div>
+                  <div className="text-secondary" style={{ fontSize: '0.6rem', marginTop: '0.2rem' }}>Saves the most money. Credit card first, then overdue debts.</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>☃️ Snowball (Alternative)</div>
+                  <div>Pay smallest balance first.</div>
+                  <div className="text-secondary" style={{ fontSize: '0.6rem', marginTop: '0.2rem' }}>Quick wins for motivation. Person #4 first ($1k).</div>
+                </div>
+              </div>
+
+              {/* Prioritized payoff order */}
+              <div style={{ fontSize: '0.7rem', marginBottom: '0.75rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>Recommended Payoff Order (Avalanche):</div>
+                {(() => {
+                  const sorted = [...debts].sort((a, b) => {
+                    // Credit card first (highest interest), then overdue by age, then others smallest-first
+                    if (a.to === 'Credit Card') return -1;
+                    if (b.to === 'Credit Card') return 1;
+                    const aOverdue = a.dueDate && Number(a.dueDate) < new Date().getFullYear();
+                    const bOverdue = b.dueDate && Number(b.dueDate) < new Date().getFullYear();
+                    if (aOverdue && !bOverdue) return -1;
+                    if (!aOverdue && bOverdue) return 1;
+                    return a.amount - b.amount;
+                  });
+                  let runningMonth = 0;
+                  const now = new Date();
+                  return sorted.map((d, i) => {
+                    const monthsForThis = Math.ceil(d.amount / 1000);
+                    runningMonth += monthsForThis;
+                    const paidBy = new Date(now.getTime() + runningMonth * 30 * 86400000);
+                    const paidByStr = paidBy.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    const isOverdue = d.dueDate && Number(d.dueDate) < now.getFullYear();
+                    return (
+                      <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: i === 0 ? '#a855f7' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, color: i === 0 ? '#fff' : 'var(--text-secondary)', flexShrink: 0 }}>{i + 1}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700 }}>{d.to} {isOverdue ? <span style={{ fontSize: '0.5rem', color: 'var(--danger)', fontWeight: 700 }}>OVERDUE</span> : ''} {d.to === 'Credit Card' ? <span style={{ fontSize: '0.5rem', color: '#f97316', fontWeight: 700 }}>HIGH INTEREST</span> : ''}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.55rem' }}>{monthsForThis} month{monthsForThis > 1 ? 's' : ''} @ $1,000/mo</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(d.amount)}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.5rem' }}>Done by {paidByStr}</div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Visual timeline */}
+              <div style={{ position: 'relative', height: '40px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                {(() => {
+                  const sorted = [...debts].sort((a, b) => {
+                    if (a.to === 'Credit Card') return -1;
+                    if (b.to === 'Credit Card') return 1;
+                    const aO = a.dueDate && Number(a.dueDate) < new Date().getFullYear();
+                    const bO = b.dueDate && Number(b.dueDate) < new Date().getFullYear();
+                    if (aO && !bO) return -1;
+                    if (!aO && bO) return 1;
+                    return a.amount - b.amount;
+                  });
+                  const totalMonths = Math.ceil(totalDebt / 1000);
+                  const colors = ['#a855f7', '#ef4444', '#f97316', '#eab308', '#3b82f6', '#10b981'];
+                  let offset = 0;
+                  return sorted.map((d, i) => {
+                    const months = Math.ceil(d.amount / 1000);
+                    const pct = (months / totalMonths) * 100;
+                    const left = (offset / totalMonths) * 100;
+                    offset += months;
+                    return (
+                      <div key={d.id} title={`${d.to}: ${months} months`}
+                        style={{ position: 'absolute', left: `${left}%`, width: `${pct}%`, height: '100%', background: colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.45rem', fontWeight: 700, color: '#fff', borderRight: '1px solid rgba(0,0,0,0.3)', transition: 'all 1s ease' }}>
+                        {pct > 8 ? d.to.split(' ')[0] : ''}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', color: 'var(--text-secondary)' }}>
+                <span>Now</span>
+                <span>🎉 Debt Free: {new Date(Date.now() + Math.ceil(totalDebt / 1000) * 30 * 86400000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
               </div>
             </div>
           </div>
