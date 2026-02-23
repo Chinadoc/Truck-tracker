@@ -83,7 +83,6 @@ function App() {
   const totalIncome = useMemo(() => incomes.reduce((sum, item) => sum + item.totalPayout, 0), [incomes]);
   const totalExpenses = useMemo(() => expenses.reduce((sum, item) => sum + item.amount, 0), [expenses]);
   const totalMiles = useMemo(() => incomes.reduce((sum, item) => sum + item.distance, 0), [incomes]);
-  const netProfit = totalIncome - totalExpenses;
 
   // Analysis Data
   const analysis = useMemo(() => {
@@ -215,159 +214,141 @@ function App() {
       <main className="main-content">
         {activeTab === 'dashboard' && (
           <div className="animate-fade-in">
-            <header className="mb-8">
-              <h1 className="text-3xl font-bold">Financial Overview</h1>
-              <p className="text-secondary mt-2">Track your trucking business performance</p>
+            <header className="mb-6">
+              <h1 className="text-3xl font-bold">Owner-Operator Command Center</h1>
+              <p className="text-secondary mt-1">2023 Freightliner Cascadia · 290k mi · 6,660 mi this cycle @ $2.00/mi</p>
             </header>
 
-            {/* Metrics Grid */}
-            <div className="dashboard-grid">
-              <div className="glass-panel stat-card text-center">
-                <div className="stat-title text-success justify-center">
-                  <TrendingUp size={16} /> Cash Revenue
+            {/* === ROW 1: The Big Picture — 3 columns === */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+
+              {/* Card 1: Gross Revenue */}
+              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div className="stat-title text-success justify-center" style={{ marginBottom: '0.25rem' }}>
+                  <TrendingUp size={14} /> Gross Revenue
                 </div>
-                <div className="stat-value">{formatCurrency(totalIncome)}</div>
-                <div className="text-secondary text-sm mt-1">Gross Earnings</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalIncome)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>{analysis.totalMiles.toLocaleString()} miles · $2.00/mi</div>
               </div>
-              <div className="glass-panel stat-card text-center">
-                <div className="stat-title text-danger justify-center">
-                  <TrendingDown size={16} /> Cash Expenses
+
+              {/* Card 2: All Costs (tracked + hidden) */}
+              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}>
+                  <TrendingDown size={14} /> Total True Costs
                 </div>
-                <div className="stat-value">{formatCurrency(totalExpenses)}</div>
-                <div className="text-secondary text-sm mt-1">Out-of-Pocket</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalExpenses + analysis.totalHiddenCosts)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Tracked + Hidden Reserves</div>
               </div>
-              <div className="glass-panel stat-card text-center" style={{ borderTop: `4px solid ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
-                <div className="stat-title justify-center" style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  <DollarSign size={16} /> Take-Home Pay
+
+              {/* Card 3: TRUE Net */}
+              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderTop: `4px solid ${analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)'}` }}>
+                <div className="stat-title justify-center" style={{ color: analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)', marginBottom: '0.25rem' }}>
+                  <DollarSign size={14} /> True Net Profit
                 </div>
-                <div className="stat-value">{formatCurrency(netProfit)}</div>
-                <div className="text-secondary text-sm mt-1">Cash Profit</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.ownerOperatorTrueProfit)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>After ALL costs & reserves</div>
               </div>
             </div>
 
-            {/* Trip Cycle Analysis & Expense Buckets */}
-            <div className="glass-panel p-6 mb-8">
-              <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] pb-4">
-                <div>
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Calculator size={24} className="text-accent" />
-                    Trip Cycle Scenario: 2023 Freightliner Cascadia
-                  </h3>
-                  <p className="text-secondary mt-1 text-sm">
-                    Tracking real expenses against expected hidden costs (290k miles, 3 years remaining)
-                  </p>
+            {/* === ROW 2: Two-panel layout === */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+
+              {/* LEFT PANEL: Per-Mile Waterfall + Buckets */}
+              <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calculator size={18} className="text-accent" />
+                  Where Every Dollar Goes (Per Mile)
+                </h3>
+
+                {/* Per-Mile Waterfall */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  {[
+                    { label: 'Rate', value: '$2.00', color: 'var(--success)', sub: 'per mile' },
+                    { label: 'Fuel', value: `-$${CASCADIA_FUEL_RATE.toFixed(2)}`, color: 'var(--danger)', sub: 'diesel/DEF' },
+                    { label: 'Depreciation', value: `-$${CASCADIA_DEPR_RATE.toFixed(3)}`, color: 'var(--danger)', sub: '$85k / 3yr' },
+                    { label: 'Maint Reserve', value: `-$${CASCADIA_MAINT_RESERVE.toFixed(2)}`, color: '#eab308', sub: 'tires/repairs' },
+                    { label: 'TRUE Net', value: `$${(2.00 - CASCADIA_FUEL_RATE - CASCADIA_DEPR_RATE - CASCADIA_MAINT_RESERVE).toFixed(3)}`, color: 'var(--accent)', sub: 'per mile profit' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{item.label}</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{item.sub}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className={`px-4 py-2 rounded-full text-sm font-bold border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.1)] text-success border-success' : 'bg-[rgba(239,68,68,0.1)] text-danger border-danger'}`}>
-                  {analysis.isBeatingCompanyRate ? 'Beating Company Rate' : 'Below Company Rate'}
+
+                {/* Expense Bucket Bars */}
+                <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Wrench size={14} /> Expense Buckets (Filling Up)
+                </h4>
+
+                {[
+                  { name: 'Diesel & DEF', tracked: analysis.trackedFuelCost, expected: analysis.expectedFuelCost, color: analysis.trackedFuelCost > analysis.expectedFuelCost ? 'var(--danger)' : 'var(--success)' },
+                  { name: 'Truck Depreciation', tracked: analysis.vehicleDepreciation, expected: analysis.vehicleDepreciation, color: 'var(--danger)' },
+                  { name: 'Maintenance & Tires', tracked: analysis.maintReserve, expected: analysis.maintReserve, color: '#eab308' },
+                ].map((bucket, i) => (
+                  <div key={i} style={{ marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+                      <span>{bucket.name}</span>
+                      <span>{formatCurrency(bucket.tracked)} / {formatCurrency(bucket.expected)}</span>
+                    </div>
+                    <div className="bucket-bar-bg">
+                      <div className="bucket-bar-fill" style={{ background: bucket.color, width: `${Math.min(100, (bucket.tracked / Math.max(1, bucket.expected)) * 100)}%`, opacity: 0.8 }}></div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Summary line */}
+                <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="text-secondary" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Hidden Reserves Set Aside:</span>
+                  <span className="text-danger" style={{ fontSize: '1.1rem', fontWeight: 800 }}>-{formatCurrency(analysis.totalHiddenCosts)}</span>
                 </div>
               </div>
 
-              <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left: 2/3 Width - Expected Expense Buckets */}
-                <div className="flex-1">
-                  <h4 className="font-bold mb-4 flex items-center gap-2 border-b border-[rgba(255,255,255,0.05)] pb-2 text-lg">
-                    <Wrench size={18} className="text-secondary" /> The "Savings Box" & Tracked Expenses
-                  </h4>
+              {/* RIGHT PANEL: Head-to-Head */}
+              <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Scale size={18} className="text-accent" />
+                  Head-to-Head
+                </h3>
 
-                  {/* Bucket 1: Fuel */}
-                  <div className="bucket-container mt-4">
-                    <div className="bucket-header">
-                      <span>Diesel & DEF (Expected $0.55/mi)</span>
-                      <span>{formatCurrency(analysis.trackedFuelCost)} / {formatCurrency(analysis.expectedFuelCost)}</span>
-                    </div>
-                    <div className="bucket-bar-bg">
-                      <div
-                        className={`bucket-bar-fill ${analysis.trackedFuelCost > analysis.expectedFuelCost ? 'bg-danger' : 'bg-success'}`}
-                        style={{ width: `${Math.min(100, (analysis.trackedFuelCost / Math.max(1, analysis.expectedFuelCost)) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Bucket 2: Vehicle Depreciation */}
-                  <div className="bucket-container mt-4">
-                    <div className="bucket-header text-danger opacity-90">
-                      <span>Truck Depreciation (Hidden Cost)</span>
-                      <span>Target: {formatCurrency(analysis.vehicleDepreciation)}</span>
-                    </div>
-                    <div className="bucket-bar-bg">
-                      {/* This is a visual representation of a hidden cost you CAN'T avoid paying eventually  */}
-                      <div className="bucket-bar-fill bg-danger opacity-70" style={{ width: '100%' }}></div>
-                    </div>
-                  </div>
-
-                  {/* Bucket 3: Maintenance Reserve */}
-                  <div className="bucket-container mt-4 mb-6">
-                    <div className="bucket-header text-warning opacity-90" style={{ color: '#eab308' }}>
-                      <span>Maintenance & Tires Reserve</span>
-                      <span>Target: {formatCurrency(analysis.maintReserve)}</span>
-                    </div>
-                    <div className="bucket-bar-bg">
-                      <div className="bucket-bar-fill opacity-70" style={{ background: '#eab308', width: '100%' }}></div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-[var(--surface-hover)] rounded-xl border border-[var(--border)]">
-                    <div className="flex justify-between items-center text-sm font-bold">
-                      <span className="text-secondary uppercase">Gross Revenue (Total Miles):</span>
-                      <span className="text-lg">{formatCurrency(totalIncome)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm mt-2 text-danger">
-                      <span className="opacity-80">Total Tracked Expenses:</span>
-                      <span>-{formatCurrency(totalExpenses)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm mt-1 text-danger">
-                      <span className="opacity-80">Total Hidden Shrinkage (Depr + Maint):</span>
-                      <span>-{formatCurrency(analysis.totalHiddenCosts)}</span>
-                    </div>
-                  </div>
+                {/* Company Driver Card */}
+                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                  <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><DollarSign size={56} /></div>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Company Driver</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(analysis.companyEquivalentEarnings)}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Guaranteed @ ${COMPANY_DRIVER_RATE.toFixed(2)}/mi · {analysis.totalMiles.toLocaleString()} mi</div>
                 </div>
 
-                {/* Right: 1/3 Width - Head to Head Comparison */}
-                <div className="lg:w-1/3 flex flex-col gap-4">
-                  <h4 className="font-bold flex items-center gap-2 border-b border-[rgba(255,255,255,0.05)] pb-2 text-lg">
-                    <Scale size={18} className="text-accent" /> Head-to-Head
-                  </h4>
+                {/* VS pill */}
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.25rem 0', position: 'relative', zIndex: 1 }}>
+                  <span style={{ background: '#000', color: 'var(--text-secondary)', fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 800, padding: '0.2rem 0.75rem', borderRadius: '20px', border: '1px solid var(--border)' }}>VS</span>
+                </div>
 
-                  {/* Company Driver Box */}
-                  <div className="bg-[rgba(0,0,0,0.3)] p-5 rounded-xl border border-[var(--border)] relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-2 opacity-10"><DollarSign size={48} /></div>
-                    <h5 className="text-xs uppercase font-bold text-secondary mb-3">Company Driver Rate</h5>
-                    <div className="text-3xl font-bold mb-1">{formatCurrency(analysis.companyEquivalentEarnings)}</div>
-                    <p className="text-sm text-secondary">guaranteed @ ${COMPANY_DRIVER_RATE.toFixed(2)}/mi</p>
-                    <p className="text-xs text-secondary mt-1">({analysis.totalMiles.toLocaleString()} total miles tracked)</p>
-                  </div>
+                {/* Owner-Op Card */}
+                <div style={{ background: analysis.isBeatingCompanyRate ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', borderRadius: '12px', padding: '1.25rem', border: `1px solid ${analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)'}`, position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                  <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><Truck size={56} /></div>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Owner-Operator True Net</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: analysis.isBeatingCompanyRate ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.ownerOperatorTrueProfit)}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>After all costs + {formatCurrency(analysis.totalHiddenCosts)} reserves</div>
+                </div>
 
-                  {/* VS Badge */}
-                  <div className="flex justify-center -my-2 relative z-10">
-                    <span className="bg-black text-secondary text-xs uppercase font-bold px-3 py-1 rounded-full border border-[var(--border)]">VS</span>
-                  </div>
-
-                  {/* Owner Operator True Net Box */}
-                  <div className={`p-5 rounded-xl border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.05)] border-success' : 'bg-[rgba(239,68,68,0.05)] border-danger'} relative overflow-hidden`}>
-                    <div className="absolute top-0 right-0 p-2 opacity-10"><Truck size={48} /></div>
-                    <h5 className="text-xs uppercase font-bold mb-3 flex items-center gap-2">
-                      <span className={analysis.isBeatingCompanyRate ? 'text-success' : 'text-danger'}>Owner Operator True Net</span>
-                    </h5>
-                    <div className={`text-3xl font-bold mb-1 ${analysis.isBeatingCompanyRate ? 'text-success' : 'text-danger'}`}>
-                      {formatCurrency(analysis.ownerOperatorTrueProfit)}
+                {/* Net Difference */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>You're making</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {formatCurrency(analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings)}
                     </div>
-                    <p className="text-sm text-secondary">
-                      After tracking costs + hiding ${formatCurrency(analysis.totalHiddenCosts)} for reserves.
-                    </p>
-                    <div className="mt-4 pt-3 border-t border-[rgba(255,255,255,0.1)]">
-                      <div className="text-xs text-secondary uppercase font-bold mb-1">Difference</div>
-                      <div className={`text-lg font-bold ${analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'text-success' : 'text-danger'}`}>
-                        {formatCurrency(analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings)}
-                      </div>
-                    </div>
+                    <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.15rem' }}>{analysis.ownerOperatorTrueProfit - analysis.companyEquivalentEarnings >= 0 ? 'MORE' : 'LESS'} than a company driver</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Main Chart */}
+            {/* === ROW 3: Chart === */}
             <div className="glass-panel chart-container">
-              <h3 className="mb-4 font-semibold text-lg flex items-center gap-2">Income vs Expenses (Monthly)</h3>
+              <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>Income vs Expenses (Monthly)</h3>
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="90%">
                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
