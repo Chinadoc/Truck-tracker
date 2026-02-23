@@ -682,21 +682,25 @@ function App() {
                   <Wrench size={14} /> Expense Buckets (Filling Up)
                 </h4>
                 {[
-                  { name: 'Diesel & DEF (Regional)', tracked: analysis.trackedFuelCost, expected: analysis.expectedFuelCost, color: analysis.trackedFuelCost > analysis.expectedFuelCost ? 'var(--danger)' : 'var(--success)' },
-                  { name: 'Deadhead (Empty Miles)', tracked: expenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), expected: totalDeadhead * (REGIONAL_DIESEL['AVG'].price / MPG), color: '#f97316' },
-                  { name: 'Truck Depreciation Reserve', tracked: analysis.vehicleDepreciation, expected: analysis.vehicleDepreciation, color: 'var(--danger)' },
-                  { name: 'Maintenance & Tires Reserve', tracked: analysis.maintReserve, expected: analysis.maintReserve, color: '#eab308' },
-                ].map((b, i) => (
-                  <div key={i} style={{ marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
-                      <span>{b.name}</span>
-                      <span>{formatCurrency(b.tracked)} / {formatCurrency(b.expected)}</span>
+                  { name: 'Diesel & DEF (Regional Est.)', amount: analysis.trackedFuelCost, color: 'var(--danger)' },
+                  { name: 'Deadhead (Empty Miles)', amount: completedExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), color: '#f97316' },
+                  { name: 'Truck Depreciation Reserve', amount: analysis.vehicleDepreciation, color: 'var(--danger)' },
+                  { name: 'Maintenance & Tires Reserve', amount: analysis.maintReserve, color: '#eab308' },
+                ].map((b, i) => {
+                  const totalCosts = totalExpenses + analysis.totalHiddenCosts;
+                  const pct = totalCosts > 0 ? (b.amount / totalCosts) * 100 : 0;
+                  return (
+                    <div key={i} style={{ marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+                        <span>{b.name}</span>
+                        <span>{formatCurrency(b.amount)}</span>
+                      </div>
+                      <div className="bucket-bar-bg">
+                        <div className="bucket-bar-fill" style={{ background: b.color, width: `${Math.min(100, pct * 2)}%`, opacity: 0.8 }}></div>
+                      </div>
                     </div>
-                    <div className="bucket-bar-bg">
-                      <div className="bucket-bar-fill" style={{ background: b.color, width: `${Math.min(100, (b.tracked / Math.max(1, b.expected)) * 100)}%`, opacity: 0.8 }}></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="text-secondary" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Hidden Reserves Set Aside:</span>
