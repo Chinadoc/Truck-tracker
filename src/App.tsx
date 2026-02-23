@@ -46,7 +46,19 @@ const VEHICLE_VALUE = 85000;
 const THREE_YEAR_MILES = 360000;
 const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
 const CASCADIA_MAINT_RESERVE = 0.15;
-const MPG = 6.5;
+const MPG = 7.0; // actual reported MPG
+
+// Tax constants (1099 self-employment)
+const SE_TAX_RATE = 0.153; // 15.3% (SS 12.4% + Medicare 2.9%)
+const FED_TAX_RATE = 0.12; // estimated federal bracket
+const TOTAL_TAX_RATE = SE_TAX_RATE + FED_TAX_RATE; // ~27.3%
+
+// Seasonal rate multipliers (spot market averages)
+const SEASONAL_RATES: Record<string, { label: string; multiplier: number; months: string }> = {
+  low: { label: 'Low Season (Feb-May)', multiplier: 0.85, months: '02,03,04,05' },
+  mid: { label: 'Shoulder (Jun-Sep)', multiplier: 1.0, months: '06,07,08,09' },
+  high: { label: 'Peak Season (Oct-Jan)', multiplier: 1.20, months: '10,11,12,01' },
+};
 
 // Regional diesel prices ($/gal, Feb 2026 estimates)
 const REGIONAL_DIESEL: Record<string, { price: number; label: string }> = {
@@ -238,13 +250,21 @@ function App() {
     const ownerOperatorCashProfit = totalIncome - totalExpenses;
     const ownerOperatorTrueProfit = ownerOperatorCashProfit - totalHiddenCosts;
     const companyEquivalentEarnings = totalMiles * COMPANY_DRIVER_RATE;
+    // Tax estimates (1099)
+    const estimatedTax = Math.max(0, ownerOperatorTrueProfit) * TOTAL_TAX_RATE;
+    const afterTaxProfit = ownerOperatorTrueProfit - estimatedTax;
+    // Seasonal projections
+    const currentMonth = new Date().toISOString().substring(5, 7);
+    const currentSeason = Object.values(SEASONAL_RATES).find(s => s.months.includes(currentMonth)) ?? SEASONAL_RATES.mid;
+    const annualMilesProjection = totalMiles * (12 / Math.max(1, incomes.length > 0 ? new Set(incomes.map(i => i.date.substring(0, 7))).size : 1));
     return {
       totalMiles, expectedFuelCost, trackedFuelCost, maintReserve,
       vehicleDepreciation, totalHiddenCosts, ownerOperatorCashProfit,
       ownerOperatorTrueProfit, companyEquivalentEarnings,
       isBeatingCompanyRate: ownerOperatorTrueProfit > companyEquivalentEarnings,
+      estimatedTax, afterTaxProfit, currentSeason, annualMilesProjection,
     };
-  }, [totalIncome, totalExpenses, totalMiles, expenses]);
+  }, [totalIncome, totalExpenses, totalMiles, expenses, incomes]);
 
   const chartData = useMemo(() => {
     const m: Record<string, { income: number; expense: number }> = {};
@@ -293,6 +313,21 @@ function App() {
   const deleteIncome = (id: string) => setIncomes(incomes.filter(i => i.id !== id));
   const deleteExpense = (id: string) => setExpenses(expenses.filter(e => e.id !== id));
   const formatCurrency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+
+  // Edit trip inline
+  const [editingTrip, setEditingTrip] = useState<string | null>(null);
+  const handleEditTrip = (id: string, field: keyof Income, value: string | number) => {
+    setIncomes(prev => prev.map(inc => {
+      if (inc.id !== id) return inc;
+      const updated = { ...inc, [field]: value };
+      if (field === 'distance' || field === 'totalPayout') {
+        const d = field === 'distance' ? Number(value) : inc.distance;
+        const p = field === 'totalPayout' ? Number(value) : inc.totalPayout;
+        updated.ratePerMile = d > 0 ? p / d : 0;
+      }
+      return updated;
+    }));
+  };
 
   // Per-trip cost detail
   const getTripExpenses = (tripId: string) => expenses.filter(e => e.id.includes(tripId));
@@ -466,7 +501,62 @@ function App() {
               </div>
             </div>
 
-            {/* Row 3: Chart */}
+            {/* Row 3: Tax & Seasonal */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              {/* Tax Estimate */}
+              <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <DollarSign size={18} className="text-danger" /> 1099 Tax Estimate
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>SE Tax (15.3%)</div>
+                    <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(Math.max(0, analysis.ownerOperatorTrueProfit) * SE_TAX_RATE)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Federal (~12%)</div>
+                    <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(Math.max(0, analysis.ownerOperatorTrueProfit) * FED_TAX_RATE)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Total Tax Reserve</div>
+                    <div className="text-danger" style={{ fontWeight: 800, fontSize: '1.1rem', marginTop: '0.25rem' }}>-{formatCurrency(analysis.estimatedTax)}</div>
+                  </div>
+                  <div style={{ background: analysis.afterTaxProfit >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', padding: '0.75rem', borderRadius: '10px', border: `1px solid ${analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>After-Tax Profit</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', marginTop: '0.25rem', color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.afterTaxProfit)}</div>
+                  </div>
+                </div>
+                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Set aside ~{(TOTAL_TAX_RATE * 100).toFixed(1)}% of true profit for quarterly 1099-NEC estimated payments.</div>
+              </div>
+
+              {/* Seasonal Projections */}
+              <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <TrendingUp size={18} style={{ color: '#eab308' }} /> Seasonal Rate Outlook
+                </h3>
+                <div style={{ background: 'rgba(234,179,8,0.08)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(234,179,8,0.3)', marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Current: {analysis.currentSeason.label}</div>
+                  <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>Rates are ~{((analysis.currentSeason.multiplier - 1) * 100).toFixed(0)}% {analysis.currentSeason.multiplier >= 1 ? 'above' : 'below'} average</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                  {Object.entries(SEASONAL_RATES).map(([key, s]) => {
+                    const avgRate = totalIncome / Math.max(1, totalMiles);
+                    const projRate = avgRate * s.multiplier / (analysis.currentSeason.multiplier || 1);
+                    const projRevenue = analysis.annualMilesProjection / 3 * projRate;
+                    return (
+                      <div key={key} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>{s.label.split('(')[0]}</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: s.multiplier >= 1 ? 'var(--success)' : 'var(--danger)', marginTop: '0.2rem' }}>${projRate.toFixed(2)}/mi</div>
+                        <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>~{formatCurrency(projRevenue)} rev</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Peak season (Oct-Jan) typically sees 15-20% higher spot rates. Plan to save during peaks for low-season dips.</div>
+              </div>
+            </div>
+
+            {/* Row 4: Chart */}
             <div className="glass-panel chart-container">
               <h3 style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1rem' }}>Income vs Expenses (Monthly)</h3>
               {chartData.length > 0 ? (
@@ -529,26 +619,40 @@ function App() {
                         const isExpanded = expandedTrip === inc.id;
                         const regionInfo = REGIONAL_DIESEL[inc.fuelRegion ?? 'AVG'];
 
+                        const isEditing = editingTrip === inc.id;
+                        const inputStyle = { background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.2rem 0.4rem', color: 'var(--text-primary)', width: '100%', fontSize: '0.85rem' } as const;
+                        const tripTax = Math.max(0, tripTrueNet) * TOTAL_TAX_RATE;
+
                         return (
                           <React.Fragment key={inc.id}>
-                            <tr onClick={() => setExpandedTrip(isExpanded ? null : inc.id)} style={{ cursor: 'pointer' }}>
+                            <tr onClick={() => !isEditing && setExpandedTrip(isExpanded ? null : inc.id)} style={{ cursor: isEditing ? 'default' : 'pointer' }}>
                               <td>
-                                <div>{inc.date}</div>
-                                {inc.departureTime && inc.arrivalTime ? <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}><Clock size={10} /> {getTripDuration(inc.departureTime, inc.arrivalTime)}</div> : null}
+                                {isEditing ? <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => handleEditTrip(inc.id, 'date', e.target.value)} /> : <div>{inc.date}</div>}
+                                {!isEditing && inc.departureTime && inc.arrivalTime ? <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}><Clock size={10} /> {getTripDuration(inc.departureTime, inc.arrivalTime)}</div> : null}
                               </td>
                               <td>
-                                <div className="font-medium text-accent">{inc.originCity}</div>
-                                <div className="text-secondary" style={{ fontSize: '0.75rem' }}>→ {inc.destCity}</div>
-                                {inc.deadheadMiles ? <div style={{ fontSize: '0.65rem', color: '#f97316' }}>+{inc.deadheadMiles} mi deadhead</div> : null}
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                    <input defaultValue={inc.originCity ?? ''} placeholder="Origin" style={inputStyle} onChange={e => handleEditTrip(inc.id, 'originCity', e.target.value)} />
+                                    <input defaultValue={inc.destCity ?? ''} placeholder="Destination" style={inputStyle} onChange={e => handleEditTrip(inc.id, 'destCity', e.target.value)} />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="font-medium text-accent">{inc.originCity}</div>
+                                    <div className="text-secondary" style={{ fontSize: '0.75rem' }}>→ {inc.destCity}</div>
+                                    {inc.deadheadMiles ? <div style={{ fontSize: '0.65rem', color: '#f97316' }}>+{inc.deadheadMiles} mi deadhead</div> : null}
+                                  </>
+                                )}
                               </td>
-                              <td>{inc.distance.toLocaleString()}</td>
+                              <td>{isEditing ? <input type="number" defaultValue={inc.distance} style={{ ...inputStyle, width: '70px' }} onChange={e => handleEditTrip(inc.id, 'distance', Number(e.target.value))} /> : inc.distance.toLocaleString()}</td>
                               <td>{formatCurrency(inc.ratePerMile)}</td>
-                              <td className="text-success font-semibold">{formatCurrency(inc.totalPayout)}</td>
+                              <td>{isEditing ? <input type="number" step="0.01" defaultValue={inc.totalPayout} style={{ ...inputStyle, width: '80px' }} onChange={e => handleEditTrip(inc.id, 'totalPayout', Number(e.target.value))} /> : <span className="text-success font-semibold">{formatCurrency(inc.totalPayout)}</span>}</td>
                               <td className="text-danger">{formatCurrency(tripFuel)}</td>
                               <td style={{ color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(tripTrueNet)}</td>
                               <td>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                  <button style={{ background: isEditing ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)', color: isEditing ? 'var(--success)' : 'var(--accent)', border: 'none', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setEditingTrip(isEditing ? null : inc.id); }}>{isEditing ? '✓ Save' : '✎ Edit'}</button>
+                                  {!isEditing && (isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
                                   <button className="btn-icon text-danger" onClick={(e) => { e.stopPropagation(); deleteIncome(inc.id); }}><Trash2 size={16} /></button>
                                 </div>
                               </td>
@@ -591,6 +695,11 @@ function App() {
                                     <div style={{ background: analysis.isBeatingCompanyRate ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', padding: '0.75rem', borderRadius: '10px', border: `1px solid ${tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
                                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>True Trip Net</div>
                                       <div style={{ fontWeight: 800, marginTop: '0.25rem', fontSize: '1.1rem', color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(tripTrueNet)}</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(239,68,68,0.06)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--danger)', fontWeight: 700 }}>1099 Tax (~{(TOTAL_TAX_RATE * 100).toFixed(0)}%)</div>
+                                      <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(tripTax)}</div>
+                                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>After tax: {formatCurrency(tripTrueNet - tripTax)}</div>
                                     </div>
                                   </div>
                                 </td>
