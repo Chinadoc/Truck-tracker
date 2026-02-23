@@ -1012,7 +1012,6 @@ function App() {
                         const tripMaint = inc.distance * CASCADIA_MAINT_RESERVE;
                         const tripTrueNet = inc.totalPayout - tripFuel - tripDH - tripDepr - tripMaint;
                         const isExpanded = expandedTrip === inc.id;
-                        const regionInfo = REGIONAL_DIESEL[inc.fuelRegion ?? 'AVG'];
 
                         const isEditing = editingTrip === inc.id;
                         const inputStyle = { background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.2rem 0.4rem', color: 'var(--text-primary)', width: '100%', fontSize: '0.85rem' } as const;
@@ -1096,8 +1095,28 @@ function App() {
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
                                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
                                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Fuel Region (3-pt avg)</div>
-                                      <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{regionInfo?.label ?? 'N/A'}</div>
-                                      {inc.destFuelRegion ? <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>→ {REGIONAL_DIESEL[inc.destFuelRegion]?.label ?? ''}</div> : null}
+                                      {(() => {
+                                        const oKey = inc.fuelRegion ?? 'AVG';
+                                        const dKey = inc.destFuelRegion;
+                                        const oPrice = REGIONAL_DIESEL[oKey]?.price ?? REGIONAL_DIESEL['AVG'].price;
+                                        const oLabel = REGIONAL_DIESEL[oKey]?.label ?? 'N/A';
+                                        if (!dKey) return <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{oLabel}</div>;
+                                        const dPrice = REGIONAL_DIESEL[dKey]?.price ?? REGIONAL_DIESEL['AVG'].price;
+                                        const dLabel = REGIONAL_DIESEL[dKey]?.label ?? '';
+                                        const midKey = `${oKey}-${dKey}`;
+                                        const mKey = ROUTE_MIDPOINTS[midKey] ?? 'AVG';
+                                        const mPrice = REGIONAL_DIESEL[mKey]?.price ?? REGIONAL_DIESEL['AVG'].price;
+                                        const mLabel = REGIONAL_DIESEL[mKey]?.label ?? 'Avg';
+                                        const avgPrice = ((oPrice + mPrice + dPrice) / 3).toFixed(2);
+                                        return (
+                                          <>
+                                            <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>Avg: ${avgPrice}/gal</div>
+                                            <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                                              {oLabel.split('(')[0].trim()} ${oPrice.toFixed(2)} → {mLabel.split('(')[0].trim()} ${mPrice.toFixed(2)} → {dLabel.split('(')[0].trim()} ${dPrice.toFixed(2)}
+                                            </div>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                     {inc.departureTime && inc.arrivalTime ? (
                                       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)' }}>
