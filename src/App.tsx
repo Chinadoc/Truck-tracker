@@ -128,10 +128,26 @@ type Income = {
 type Expense = {
   id: string;
   date: string;
-  category: 'Fuel' | 'Maintenance' | 'Insurance' | 'Tolls' | 'Other' | 'Deadhead' | 'Permits' | 'Truck Payment' | 'Parking' | 'ELD' | 'Lumper' | 'IFTA';
+  category: 'Fuel' | 'Maintenance' | 'Insurance' | 'Tolls' | 'Other' | 'Deadhead' | 'Permits' | 'Truck Payment' | 'Parking' | 'ELD' | 'Lumper' | 'IFTA' | 'Dispatch' | 'Lock Box' | 'Trailer' | 'Registration' | 'Food';
   description: string;
   amount: number;
 };
+
+type PersonalExpense = {
+  id: string;
+  category: string;
+  description: string;
+  monthlyAmount: number;
+};
+
+const INITIAL_PERSONAL: PersonalExpense[] = [
+  { id: 'p1', category: 'Housing', description: 'House Payment', monthlyAmount: 2000 },
+  { id: 'p2', category: 'Utilities', description: 'Utilities', monthlyAmount: 300 },
+  { id: 'p3', category: 'Family', description: 'Afghanistan Family Support', monthlyAmount: 1000 },
+  { id: 'p4', category: 'Phone', description: 'Mobile Phone', monthlyAmount: 100 },
+  { id: 'p5', category: 'Food', description: 'Food & Groceries', monthlyAmount: 1200 },
+  { id: 'p6', category: 'Clothing', description: 'Clothing', monthlyAmount: 200 },
+];
 
 // === REAL TRIP DATA ===
 const INITIAL_TRIPS: Income[] = [
@@ -226,6 +242,20 @@ const buildExpenses = (): Expense[] => {
       });
     }
   });
+
+  // === RECURRING MONTHLY BUSINESS EXPENSES (Feb 2026) ===
+  const totalRevenue = INITIAL_TRIPS.reduce((s, t) => s + t.totalPayout, 0);
+  const tripDays = INITIAL_TRIPS.length > 0 ? Math.max(1, Math.ceil((new Date(INITIAL_TRIPS[INITIAL_TRIPS.length - 1].date).getTime() - new Date(INITIAL_TRIPS[0].date).getTime()) / 86400000) + 1) : 30;
+  exps.push(
+    { id: 'ins-feb', date: '2026-02-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2400 },
+    { id: 'reg-feb', date: '2026-02-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
+    { id: 'toll-feb', date: '2026-02-01', category: 'Tolls', description: 'Tolls & Scales (monthly avg)', amount: 250 },
+    { id: 'disp-feb', date: '2026-02-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${totalRevenue.toLocaleString()} revenue)`, amount: Math.round(totalRevenue * 0.10 * 100) / 100 },
+    { id: 'lock-feb', date: '2026-02-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
+    { id: 'trlr-feb', date: '2026-02-01', category: 'Trailer', description: 'Trailer Rental (monthly)', amount: 600 },
+    { id: 'food-feb', date: '2026-02-01', category: 'Food', description: `Road Food (~$20/day × ${tripDays} days)`, amount: tripDays * 20 },
+  );
+
   return exps;
 };
 
@@ -238,9 +268,10 @@ const loadState = <T,>(key: string, fallback: T): T => {
 };
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'map' | 'calendar' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'map' | 'calendar' | 'reports' | 'personal'>('dashboard');
   const [incomes, setIncomes] = useState<Income[]>(() => loadState('rl_incomes', INITIAL_TRIPS));
   const [expenses, setExpenses] = useState<Expense[]>(() => loadState('rl_expenses', INITIAL_EXPENSES));
+  const [personalExpenses, setPersonalExpenses] = useState<PersonalExpense[]>(() => loadState('rl_personal', INITIAL_PERSONAL));
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
   const [pdfText, setPdfText] = useState<string>('');
@@ -251,6 +282,10 @@ function App() {
   // Persist to localStorage on change
   useEffect(() => { localStorage.setItem('rl_incomes', JSON.stringify(incomes)); }, [incomes]);
   useEffect(() => { localStorage.setItem('rl_expenses', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('rl_personal', JSON.stringify(personalExpenses)); }, [personalExpenses]);
+
+  // Personal expense totals
+  const totalPersonalMonthly = useMemo(() => personalExpenses.reduce((s, p) => s + p.monthlyAmount, 0), [personalExpenses]);
 
   // Future/pending trip check
   const isFutureTrip = (date: string) => new Date(date) > new Date();
@@ -427,6 +462,7 @@ function App() {
             { tab: 'expenses' as const, icon: <TrendingDown size={20} className={activeTab === 'expenses' ? 'text-accent' : 'text-danger'} />, label: 'Expenses' },
             { tab: 'calendar' as const, icon: <CalendarDays size={20} className={activeTab === 'calendar' ? 'text-accent' : 'text-secondary'} />, label: 'Calendar' },
             { tab: 'reports' as const, icon: <FileText size={20} className={activeTab === 'reports' ? 'text-accent' : 'text-secondary'} />, label: 'Reports' },
+            { tab: 'personal' as const, icon: <DollarSign size={20} className={activeTab === 'personal' ? 'text-accent' : 'text-secondary'} />, label: 'Personal' },
             { tab: 'map' as const, icon: <MapPin size={20} className={activeTab === 'map' ? 'text-accent' : 'text-secondary'} />, label: 'Route Map' },
           ]).map(n => (
             <button key={n.tab} className={`nav-item ${activeTab === n.tab ? 'active' : ''}`} onClick={() => setActiveTab(n.tab)}>
@@ -975,6 +1011,83 @@ function App() {
           );
         })()}
 
+        {/* ====== PERSONAL ====== */}
+        {activeTab === 'personal' && (
+          <div className="animate-fade-in">
+            <header className="mb-6">
+              <h1 className="text-3xl font-bold">Personal Expenses</h1>
+              <p className="text-secondary mt-1">Monthly personal budget — {formatCurrency(totalPersonalMonthly)}/mo · {formatCurrency(totalPersonalMonthly * 12)}/yr</p>
+            </header>
+
+            {/* Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="glass-panel stat-card"><div className="stat-title"><DollarSign size={16} /> Monthly Personal</div><div className="stat-value text-danger" style={{ fontSize: '1.8rem' }}>{formatCurrency(totalPersonalMonthly)}</div></div>
+              <div className="glass-panel stat-card"><div className="stat-title"><TrendingUp size={16} /> Monthly Business Net</div><div className="stat-value" style={{ fontSize: '1.8rem', color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.afterTaxProfit)}</div><div className="text-secondary" style={{ fontSize: '0.7rem' }}>After tax & all biz expenses</div></div>
+              <div className="glass-panel stat-card"><div className="stat-title"><Scale size={16} /> Remaining After All</div><div className="stat-value" style={{ fontSize: '1.8rem', color: (analysis.afterTaxProfit - totalPersonalMonthly) >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.afterTaxProfit - totalPersonalMonthly)}</div><div className="text-secondary" style={{ fontSize: '0.7rem' }}>Business profit minus personal</div></div>
+            </div>
+
+            {/* Personal Expense Table */}
+            <div className="glass-panel p-0 overflow-hidden">
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr><th>Category</th><th>Description</th><th>Monthly</th><th>Annual</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {personalExpenses.map(pe => (
+                      <tr key={pe.id}>
+                        <td style={{ fontWeight: 700 }}>{pe.category}</td>
+                        <td>{pe.description}</td>
+                        <td>
+                          <input type="number" step="0.01" defaultValue={pe.monthlyAmount} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.3rem 0.5rem', color: 'var(--text-primary)', width: '100px', fontSize: '0.85rem' }} onChange={e => setPersonalExpenses(prev => prev.map(p => p.id === pe.id ? { ...p, monthlyAmount: Number(e.target.value) || 0 } : p))} />
+                        </td>
+                        <td className="text-danger">{formatCurrency(pe.monthlyAmount * 12)}</td>
+                        <td><button className="btn-icon text-danger" onClick={() => setPersonalExpenses(prev => prev.filter(p => p.id !== pe.id))}><Trash2 size={16} /></button></td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: '2px solid var(--border)' }}>
+                      <td colSpan={2} style={{ fontWeight: 800, textAlign: 'right' }}>TOTAL</td>
+                      <td style={{ fontWeight: 800 }} className="text-danger">{formatCurrency(totalPersonalMonthly)}</td>
+                      <td style={{ fontWeight: 800 }} className="text-danger">{formatCurrency(totalPersonalMonthly * 12)}</td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Add personal expense */}
+            <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => {
+              const cat = prompt('Category (e.g. Savings, Gym, Entertainment)');
+              const desc = prompt('Description');
+              const amt = prompt('Monthly amount ($)');
+              if (cat && desc && amt) setPersonalExpenses(prev => [...prev, { id: `p-${Date.now()}`, category: cat, description: desc, monthlyAmount: Number(amt) || 0 }]);
+            }}><Plus size={18} /> Add Personal Expense</button>
+
+            {/* Break-even analysis */}
+            <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid var(--accent)' }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem' }}>Break-Even Analysis</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                  <div className="text-secondary" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700 }}>Need Monthly</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem' }}>{formatCurrency(totalPersonalMonthly + totalExpenses + analysis.totalHiddenCosts)}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.6rem' }}>Biz + Personal + Tax</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                  <div className="text-secondary" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Miles/Mo</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem' }}>{Math.ceil((totalPersonalMonthly + totalExpenses + analysis.totalHiddenCosts) / (totalIncome / Math.max(1, analysis.totalMiles))).toLocaleString()}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.6rem' }}>at current $/mi rate</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                  <div className="text-secondary" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700 }}>Min Trips/Mo</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem' }}>{Math.ceil(Math.ceil((totalPersonalMonthly + totalExpenses + analysis.totalHiddenCosts) / (totalIncome / Math.max(1, analysis.totalMiles))) / (analysis.totalMiles / Math.max(1, incomes.length)))}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.6rem' }}>at avg trip length</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ====== MAP ====== */}
         {activeTab === 'map' && (
           <div className="animate-fade-in">
@@ -1066,6 +1179,11 @@ function App() {
                     <option value="ELD">ELD / Subscriptions</option>
                     <option value="Lumper">Lumper Fees</option>
                     <option value="IFTA">IFTA / Fuel Tax</option>
+                    <option value="Dispatch">Dispatch Fee</option>
+                    <option value="Lock Box">Lock Box</option>
+                    <option value="Trailer">Trailer Rental</option>
+                    <option value="Registration">Truck Registration</option>
+                    <option value="Food">Road Food</option>
                     <option value="Other">Other Operational</option>
                   </select>
                 </div>
