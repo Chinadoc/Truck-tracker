@@ -644,17 +644,43 @@ function App() {
             {/* Revenue Waterfall — Money Flow Animation */}
             {(() => {
               const bizExpenses = totalExpenses + analysis.totalHiddenCosts;
-              const personalCosts = totalPersonalMonthly;
+              const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
+              const personalCosts = totalPersonalMonthly - debtPayment;
               const taxCosts = analysis.estimatedTax;
               const afterBiz = totalIncome - bizExpenses;
               const afterPersonal = afterBiz - personalCosts;
               const afterTax = afterPersonal - taxCosts;
+              const afterDebt = afterTax - debtPayment;
               const buckets = [
-                { label: '🏢 Business Costs', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls · Depreciation · Maintenance', delay: '0s' },
-                { label: '🏠 Personal & Family', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: 'Housing · Family · Food · Utilities · Phone · Clothing · Debts', delay: '0.5s' },
-                { label: '🏛 Taxes (1099)', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE Tax ${(SE_TAX_RATE * 100).toFixed(1)}% + Federal ~${(FED_TAX_RATE * 100).toFixed(0)}%`, delay: '1s' },
-                { label: '💰 Pure Profit', amount: Math.max(0, afterTax), filled: Math.max(0, afterTax), color: '#10b981', details: afterTax >= 0 ? 'Savings · Investments · Growth' : 'IN THE RED — cut costs or run more loads', delay: '1.5s' },
+                { label: '🏢 Business', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls', delay: '0s' },
+                { label: '🏠 Personal', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: 'Housing · Family · Food · Utilities', delay: '0.4s' },
+                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE ${(SE_TAX_RATE * 100).toFixed(0)}% + Fed ~${(FED_TAX_RATE * 100).toFixed(0)}%`, delay: '0.8s' },
+                { label: '💳 Debt Payoff', amount: debtPayment, filled: Math.max(0, Math.min(afterTax, debtPayment)), color: '#a855f7', details: `${formatCurrency(totalDebt)} remaining`, delay: '1.2s' },
+                { label: '💰 Profit', amount: Math.max(0, afterDebt), filled: Math.max(0, afterDebt), color: '#10b981', details: afterDebt >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.6s' },
               ];
+
+              // Reserve fund targets — how much you SHOULD be saving
+              const truckTarget = 85000; // replacement cost
+              const truckLifetimeSaved = totalMiles * CASCADIA_DEPR_RATE; // total set aside
+              const tireTarget = 4500; // full tire set cost
+              const tireLifetimeSaved = totalMiles * CASCADIA_MAINT_RESERVE;
+
+              const CircleFill = ({ pct, color, size, icon }: { pct: number; color: string; size: number; icon: string }) => {
+                const r = (size - 8) / 2;
+                const circ = 2 * Math.PI * r;
+                const offset = circ - (Math.min(pct, 100) / 100) * circ;
+                return (
+                  <div style={{ position: 'relative', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width={size} height={size} style={{ position: 'absolute', transform: 'rotate(-90deg)' }}>
+                      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+                        strokeDasharray={circ} strokeDashoffset={offset}
+                        style={{ transition: 'stroke-dashoffset 2s ease-out' }} />
+                    </svg>
+                    <span style={{ fontSize: size * 0.35, zIndex: 1 }}>{icon}</span>
+                  </div>
+                );
+              };
 
               return (
                 <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -664,55 +690,114 @@ function App() {
                   <p className="text-secondary" style={{ fontSize: '0.75rem', marginBottom: '1.25rem' }}>{formatCurrency(totalIncome)} revenue → filling buckets in order of priority</p>
 
                   {/* Horizontal bar breakdown */}
-                  <div style={{ display: 'flex', height: '32px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', height: '28px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
                     {totalIncome > 0 && buckets.map((b, i) => {
                       const pct = (b.filled / totalIncome) * 100;
                       return pct > 0 ? (
-                        <div key={i} style={{ width: `${pct}%`, background: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: '#fff', transition: 'width 1.5s ease-out', minWidth: pct > 3 ? '0' : '0' }}>{pct > 8 ? `${pct.toFixed(0)}%` : ''}</div>
+                        <div key={i} style={{ width: `${pct}%`, background: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>{pct > 8 ? `${pct.toFixed(0)}%` : ''}</div>
                       ) : null;
                     })}
-                    {afterTax < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
+                    {afterDebt < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
                   </div>
 
-                  {/* Bucket columns */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                  {/* Bucket columns — 5 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.6rem' }}>
                     {buckets.map((b, i) => {
                       const fillPct = b.amount > 0 ? Math.min(100, (b.filled / b.amount) * 100) : 0;
-                      const isFunded = b.filled >= b.amount;
+                      const isFunded = b.filled >= b.amount && b.amount > 0;
                       const isPartial = b.filled > 0 && b.filled < b.amount;
                       return (
                         <div key={i} style={{ textAlign: 'center' }}>
-                          {/* Bucket visualization */}
-                          <div style={{ height: '120px', position: 'relative', background: 'rgba(0,0,0,0.25)', borderRadius: '0 0 12px 12px', border: '1px solid var(--border)', borderTop: `3px solid ${b.color}`, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                            <div className="waterfall-fill" style={{ '--fill-pct': `${fillPct}%`, '--fill-delay': b.delay, background: `linear-gradient(to top, ${b.color}, ${b.color}88)`, width: '100%', position: 'absolute', bottom: 0, borderRadius: '0 0 11px 11px' } as React.CSSProperties} />
-                            <div style={{ position: 'relative', zIndex: 1, padding: '0.5rem', fontSize: '1.1rem', fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                          <div style={{ height: '100px', position: 'relative', background: 'rgba(0,0,0,0.25)', borderRadius: '0 0 10px 10px', border: '1px solid var(--border)', borderTop: `3px solid ${b.color}`, overflow: 'hidden' }}>
+                            <div className="waterfall-fill" style={{ '--fill-pct': `${fillPct}%`, '--fill-delay': b.delay, background: `linear-gradient(to top, ${b.color}, ${b.color}88)`, width: '100%', position: 'absolute', bottom: 0, borderRadius: '0 0 9px 9px' } as React.CSSProperties} />
+                            <div style={{ position: 'relative', zIndex: 1, padding: '0.35rem', fontSize: '0.9rem', fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)', height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                               {formatCurrency(b.filled)}
                             </div>
                           </div>
-                          {/* Label */}
-                          <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>{b.label}</div>
-                          <div className="text-secondary" style={{ fontSize: '0.6rem', marginTop: '0.15rem' }}>
-                            {i < 3 ? `Need: ${formatCurrency(b.amount)}` : (afterTax >= 0 ? 'Take home!' : formatCurrency(afterTax))}
+                          <div style={{ marginTop: '0.4rem', fontSize: '0.7rem', fontWeight: 700 }}>{b.label}</div>
+                          <div style={{ fontSize: '0.5rem', color: b.color, marginTop: '0.15rem' }}>
+                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : i === 4 ? (afterDebt >= 0 ? '✓ Take home' : formatCurrency(afterDebt)) : '✗ Empty'}
                           </div>
-                          <div style={{ fontSize: '0.55rem', marginTop: '0.25rem', color: b.color }}>
-                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : '✗ Empty'}
-                          </div>
-                          <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem', lineHeight: '1.3' }}>{b.details}</div>
                         </div>
                       );
                     })}
                   </div>
 
+                  {/* Reserve Savings — Fill-up Icons */}
+                  <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(0,0,0,0.15)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      🏦 Reserve Funds Building Up
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                      {/* Truck Replacement Fund */}
+                      <div style={{ textAlign: 'center' }}>
+                        <CircleFill pct={(truckLifetimeSaved / truckTarget) * 100} color="#3b82f6" size={80} icon="🚛" />
+                        <div style={{ fontWeight: 700, fontSize: '0.8rem', marginTop: '0.35rem' }}>Truck Fund</div>
+                        <div style={{ fontWeight: 800, color: '#3b82f6', fontSize: '0.9rem' }}>{formatCurrency(truckLifetimeSaved)}</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>of {formatCurrency(truckTarget)} goal</div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '0.3rem', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, (truckLifetimeSaved / truckTarget) * 100)}%`, height: '100%', background: '#3b82f6', borderRadius: '2px', transition: 'width 2s ease-out' }} />
+                        </div>
+                        <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem' }}>{((truckLifetimeSaved / truckTarget) * 100).toFixed(1)}% saved</div>
+                      </div>
+
+                      {/* Tires & Maintenance Fund */}
+                      <div style={{ textAlign: 'center' }}>
+                        <CircleFill pct={(tireLifetimeSaved / tireTarget) * 100} color="#eab308" size={80} icon="🔧" />
+                        <div style={{ fontWeight: 700, fontSize: '0.8rem', marginTop: '0.35rem' }}>Tires & Maint</div>
+                        <div style={{ fontWeight: 800, color: '#eab308', fontSize: '0.9rem' }}>{formatCurrency(tireLifetimeSaved)}</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>of {formatCurrency(tireTarget)} next set</div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '0.3rem', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, (tireLifetimeSaved / tireTarget) * 100)}%`, height: '100%', background: '#eab308', borderRadius: '2px', transition: 'width 2s ease-out' }} />
+                        </div>
+                        <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem' }}>{((tireLifetimeSaved / tireTarget) * 100).toFixed(1)}% saved</div>
+                      </div>
+
+                      {/* Debt Payoff Progress */}
+                      <div style={{ textAlign: 'center' }}>
+                        <CircleFill pct={totalDebt > 0 ? ((14500 - totalDebt) / 14500) * 100 : 100} color="#a855f7" size={80} icon="💳" />
+                        <div style={{ fontWeight: 700, fontSize: '0.8rem', marginTop: '0.35rem' }}>Debt Freedom</div>
+                        <div style={{ fontWeight: 800, color: '#a855f7', fontSize: '0.9rem' }}>{formatCurrency(14500 - totalDebt)} paid</div>
+                        <div className="text-secondary" style={{ fontSize: '0.6rem' }}>{formatCurrency(totalDebt)} remaining</div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '0.3rem', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, ((14500 - totalDebt) / 14500) * 100)}%`, height: '100%', background: '#a855f7', borderRadius: '2px', transition: 'width 2s ease-out' }} />
+                        </div>
+                        <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem' }}>~{Math.ceil(totalDebt / Math.max(1, debtPayment))} months to go</div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Summary line */}
-                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: afterTax >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '10px', border: `1px solid ${afterTax >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                      {afterTax >= 0 ? '✓ All buckets funded — profit remaining' : `⚠ ${formatCurrency(Math.abs(afterTax))} short — need more loads or cut expenses`}
+                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: afterDebt >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '10px', border: `1px solid ${afterDebt >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: afterDebt >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {afterDebt >= 0 ? '✓ All buckets funded — profit remaining' : `⚠ ${formatCurrency(Math.abs(afterDebt))} short — need more loads or cut expenses`}
                     </span>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(afterTax)}</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: afterDebt >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(afterDebt)}</span>
                   </div>
                 </div>
               );
             })()}
+
+            {/* Compact Expense Breakdown on Dashboard */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
+              {[
+                { label: '🛡 Insurance', val: '$2,400/mo', type: 'fixed' },
+                { label: '🚛 Trailer', val: '$600/mo', type: 'fixed' },
+                { label: '🛣 Tolls', val: '$250/mo', type: 'fixed' },
+                { label: '🔒 Lock Box', val: '$100/mo', type: 'fixed' },
+                { label: '📋 Registration', val: '$133/mo', type: 'fixed' },
+                { label: '⛽ Fuel', val: formatCurrency(analysis.trackedFuelCost), type: 'variable' },
+                { label: '📞 Dispatch 10%', val: formatCurrency(totalIncome * 0.10), type: 'variable' },
+                { label: '📉 Depreciation', val: formatCurrency(analysis.vehicleDepreciation), type: 'variable' },
+                { label: '🔧 Maintenance', val: formatCurrency(analysis.maintReserve), type: 'variable' },
+                { label: '🍔 Road Food', val: formatCurrency(expenses.filter(e => e.category === 'Food').reduce((s, e) => s + e.amount, 0)), type: 'variable' },
+              ].map((e, i) => (
+                <div key={i} style={{ background: 'rgba(0,0,0,0.2)', border: `1px solid ${e.type === 'fixed' ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.2)'}`, borderRadius: '8px', padding: '0.5rem 0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
+                  <span>{e.label}</span>
+                  <span style={{ fontWeight: 700, color: e.type === 'fixed' ? 'var(--danger)' : '#f97316', fontSize: '0.75rem' }}>{e.val}</span>
+                </div>
+              ))}
+            </div>
 
             {/* Row 3: Tax & Seasonal */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
