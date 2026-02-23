@@ -641,6 +641,79 @@ function App() {
               </div>
             </div>
 
+            {/* Revenue Waterfall — Money Flow Animation */}
+            {(() => {
+              const bizExpenses = totalExpenses + analysis.totalHiddenCosts;
+              const personalCosts = totalPersonalMonthly;
+              const taxCosts = analysis.estimatedTax;
+              const afterBiz = totalIncome - bizExpenses;
+              const afterPersonal = afterBiz - personalCosts;
+              const afterTax = afterPersonal - taxCosts;
+              const buckets = [
+                { label: '🏢 Business Costs', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls · Depreciation · Maintenance', delay: '0s' },
+                { label: '🏠 Personal & Family', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: 'Housing · Family · Food · Utilities · Phone · Clothing · Debts', delay: '0.5s' },
+                { label: '🏛 Taxes (1099)', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE Tax ${(SE_TAX_RATE * 100).toFixed(1)}% + Federal ~${(FED_TAX_RATE * 100).toFixed(0)}%`, delay: '1s' },
+                { label: '💰 Pure Profit', amount: Math.max(0, afterTax), filled: Math.max(0, afterTax), color: '#10b981', details: afterTax >= 0 ? 'Savings · Investments · Growth' : 'IN THE RED — cut costs or run more loads', delay: '1.5s' },
+              ];
+
+              return (
+                <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <TrendingDown size={18} style={{ color: '#3b82f6' }} /> Where Your Revenue Goes
+                  </h3>
+                  <p className="text-secondary" style={{ fontSize: '0.75rem', marginBottom: '1.25rem' }}>{formatCurrency(totalIncome)} revenue → filling buckets in order of priority</p>
+
+                  {/* Horizontal bar breakdown */}
+                  <div style={{ display: 'flex', height: '32px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
+                    {totalIncome > 0 && buckets.map((b, i) => {
+                      const pct = (b.filled / totalIncome) * 100;
+                      return pct > 0 ? (
+                        <div key={i} style={{ width: `${pct}%`, background: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: '#fff', transition: 'width 1.5s ease-out', minWidth: pct > 3 ? '0' : '0' }}>{pct > 8 ? `${pct.toFixed(0)}%` : ''}</div>
+                      ) : null;
+                    })}
+                    {afterTax < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
+                  </div>
+
+                  {/* Bucket columns */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                    {buckets.map((b, i) => {
+                      const fillPct = b.amount > 0 ? Math.min(100, (b.filled / b.amount) * 100) : 0;
+                      const isFunded = b.filled >= b.amount;
+                      const isPartial = b.filled > 0 && b.filled < b.amount;
+                      return (
+                        <div key={i} style={{ textAlign: 'center' }}>
+                          {/* Bucket visualization */}
+                          <div style={{ height: '120px', position: 'relative', background: 'rgba(0,0,0,0.25)', borderRadius: '0 0 12px 12px', border: '1px solid var(--border)', borderTop: `3px solid ${b.color}`, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                            <div className="waterfall-fill" style={{ '--fill-pct': `${fillPct}%`, '--fill-delay': b.delay, background: `linear-gradient(to top, ${b.color}, ${b.color}88)`, width: '100%', position: 'absolute', bottom: 0, borderRadius: '0 0 11px 11px' } as React.CSSProperties} />
+                            <div style={{ position: 'relative', zIndex: 1, padding: '0.5rem', fontSize: '1.1rem', fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                              {formatCurrency(b.filled)}
+                            </div>
+                          </div>
+                          {/* Label */}
+                          <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>{b.label}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.6rem', marginTop: '0.15rem' }}>
+                            {i < 3 ? `Need: ${formatCurrency(b.amount)}` : (afterTax >= 0 ? 'Take home!' : formatCurrency(afterTax))}
+                          </div>
+                          <div style={{ fontSize: '0.55rem', marginTop: '0.25rem', color: b.color }}>
+                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : '✗ Empty'}
+                          </div>
+                          <div className="text-secondary" style={{ fontSize: '0.5rem', marginTop: '0.15rem', lineHeight: '1.3' }}>{b.details}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Summary line */}
+                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: afterTax >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '10px', border: `1px solid ${afterTax >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {afterTax >= 0 ? '✓ All buckets funded — profit remaining' : `⚠ ${formatCurrency(Math.abs(afterTax))} short — need more loads or cut expenses`}
+                    </span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(afterTax)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Row 3: Tax & Seasonal */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
               {/* Tax Estimate */}

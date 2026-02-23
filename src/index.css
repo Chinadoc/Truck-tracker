@@ -17,6 +17,38 @@
   color-scheme: dark light;
 }
 
+/* Animations */
+@keyframes fillUp {
+  from {
+    height: 0%;
+  }
+
+  to {
+    height: var(--fill-pct);
+  }
+}
+
+@keyframes flowPulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.waterfall-fill {
+  animation: fillUp 1.5s ease-out forwards;
+  animation-delay: var(--fill-delay, 0s);
+}
+
+.flow-dot {
+  animation: flowPulse 1s ease-in-out infinite;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
