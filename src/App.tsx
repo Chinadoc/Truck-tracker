@@ -31,6 +31,10 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { v4 as uuidv4 } from 'uuid';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // Fix leaflet default icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -232,6 +236,8 @@ function App() {
   const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
+  const [pdfText, setPdfText] = useState<string>('');
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
 
@@ -372,6 +378,27 @@ function App() {
       setExpenses(prev => [...prev, ...newExps].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setIsManifestModalOpen(false);
     }
+  };
+
+  // PDF text extraction
+  const handlePdfUpload = async (file: File) => {
+    setPdfLoading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+      setPdfText(fullText);
+    } catch (err) {
+      console.error('PDF parse error:', err);
+      setPdfText('Error reading PDF. Try a different file or paste the text manually.');
+    }
+    setPdfLoading(false);
   };
 
   return (
@@ -870,20 +897,44 @@ function App() {
         </div>
       )}
 
-      {/* Manifest Upload Modal */}
+      {/* Manifest / PDF Upload Modal */}
       {isManifestModalOpen && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setIsManifestModalOpen(false)}>
-          <div className="modal animate-scale-in" style={{ maxWidth: '600px' }}>
-            <div className="modal-header"><h2 className="modal-title">Upload Manifest / CSV</h2><button className="btn-icon" onClick={() => setIsManifestModalOpen(false)}><X size={20} /></button></div>
-            <p className="text-secondary" style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>Paste CSV data or upload a .csv file. Format: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.8rem' }}>date,origin,destination,miles,pay,broker</code></p>
-            <textarea id="manifest-text" rows={8} placeholder={`2026-03-01,Houston TX,Dallas TX,240,650,TQL\n2026-03-03,Dallas TX,Denver CO,790,1800,CH Robinson`} style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}></textarea>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600 }}>
-                <Upload size={16} /> Or upload .csv
+          <div className="modal animate-scale-in" style={{ maxWidth: '650px' }}>
+            <div className="modal-header"><h2 className="modal-title">Upload Document</h2><button className="btn-icon" onClick={() => { setIsManifestModalOpen(false); setPdfText(''); }}><X size={20} /></button></div>
+
+            {/* Step 1: Upload */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+              <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', background: 'rgba(59,130,246,0.06)', border: '2px dashed rgba(59,130,246,0.3)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <Upload size={24} style={{ color: 'var(--accent)', marginBottom: '0.5rem' }} />
+                <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.9rem' }}>Upload PDF</span>
+                <span className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>Manifest, BOL, Rate Con, Fuel Receipt</span>
+                <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); }} />
+              </label>
+              <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', background: 'rgba(16,185,129,0.06)', border: '2px dashed rgba(16,185,129,0.3)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <Upload size={24} style={{ color: 'var(--success)', marginBottom: '0.5rem' }} />
+                <span style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.9rem' }}>Upload CSV</span>
+                <span className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>date,origin,dest,miles,pay,broker</span>
                 <input type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = (ev) => handleManifestUpload(ev.target?.result as string); r.readAsText(f); } }} />
               </label>
-              <div style={{ flex: 1 }}></div>
-              <button className="btn-primary" onClick={() => { const el = document.getElementById('manifest-text') as HTMLTextAreaElement; if (el?.value) handleManifestUpload(el.value); }}>Import Trips</button>
+            </div>
+
+            {pdfLoading && <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--accent)' }}>Extracting text from PDF...</div>}
+
+            {/* Step 2: Review extracted text or paste manually */}
+            <p className="text-secondary" style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}>{pdfText ? '✅ Text extracted from PDF — review and edit, then click Import:' : 'Or paste data manually (CSV or raw text from a manifest):'}</p>
+            <textarea
+              id="manifest-text"
+              rows={10}
+              value={pdfText}
+              onChange={(e) => setPdfText(e.target.value)}
+              placeholder={`Paste manifest/BOL text here, or upload a PDF above.\n\nCSV format:\n2026-03-01,Houston TX,Dallas TX,240,650,TQL\n2026-03-03,Dallas TX,Denver CO,790,1800,CH Robinson\n\nOr raw text - we'll show it for you to review.`}
+              style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical', lineHeight: 1.5 }}
+            />
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+              <button style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }} onClick={() => { setIsManifestModalOpen(false); setPdfText(''); }}>Cancel</button>
+              <button className="btn-primary" onClick={() => { if (pdfText) handleManifestUpload(pdfText); }}>Import as Trips</button>
             </div>
           </div>
         </div>
