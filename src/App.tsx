@@ -332,7 +332,15 @@ function App() {
   const completedIncomes = useMemo(() => incomes.filter(i => !isFutureTrip(i.date)), [incomes]);
   const pendingIncomes = useMemo(() => incomes.filter(i => isFutureTrip(i.date)), [incomes]);
   const totalIncome = useMemo(() => completedIncomes.reduce((s, i) => s + i.totalPayout, 0), [completedIncomes]);
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  // Filter expenses to exclude ones from pending trips (match revenue exclusion)
+  const pendingTripIds = useMemo(() => new Set(incomes.filter(i => isFutureTrip(i.date)).map(i => i.id)), [incomes]);
+  const completedExpenses = useMemo(() => expenses.filter(e => {
+    // Expense IDs are like 'fuel-t8' or 'dh-t8' — extract trip ID
+    const match = e.id.match(/^(?:fuel|dh)-(.+)$/);
+    if (match) return !pendingTripIds.has(match[1]);
+    return true; // keep non-trip expenses (insurance, tolls, etc.)
+  }), [expenses, pendingTripIds]);
+  const totalExpenses = useMemo(() => completedExpenses.reduce((s, e) => s + e.amount, 0), [completedExpenses]);
   const totalMiles = useMemo(() => completedIncomes.reduce((s, i) => s + i.distance, 0), [completedIncomes]);
   const totalDeadhead = useMemo(() => completedIncomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [completedIncomes]);
   const pendingRevenue = useMemo(() => pendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [pendingIncomes]);
@@ -576,10 +584,10 @@ function App() {
               return (
                 <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    {goalMet ? '✅' : '🎯'} {goalMet ? 'Take-Home Goals Met!' : 'Loads to Cover Your Nut'}
+                    {goalMet ? '✅' : '📊'} Monthly Break-Even
                   </h3>
                   <div className="text-secondary" style={{ fontSize: '0.6rem', marginBottom: '0.6rem' }}>
-                    Net Profit ({formatCurrency(trueNetProfit)}) vs Take-Home Need ({formatCurrency(takeHomeNeed)}) = <strong style={{ color: trueNetProfit >= takeHomeNeed ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit - takeHomeNeed)}</strong>
+                    Net Profit: <strong style={{ color: trueNetProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit)}</strong> — Need {formatCurrency(takeHomeNeed)} for personal + debt
                   </div>
 
                   {/* Progress bar — personal + debt */}
