@@ -654,8 +654,20 @@ function App() {
                           <React.Fragment key={inc.id}>
                             <tr onClick={() => !isEditing && setExpandedTrip(isExpanded ? null : inc.id)} style={{ cursor: isEditing ? 'default' : 'pointer' }}>
                               <td>
-                                {isEditing ? <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => handleEditTrip(inc.id, 'date', e.target.value)} /> : <div>{inc.date}</div>}
-                                {!isEditing && inc.departureTime && inc.arrivalTime ? <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}><Clock size={10} /> {getTripDuration(inc.departureTime, inc.arrivalTime)}</div> : null}
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                    <input type="date" defaultValue={inc.date} style={inputStyle} onChange={e => handleEditTrip(inc.id, 'date', e.target.value)} />
+                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700, marginTop: '0.15rem' }}>PICKUP</div>
+                                    <input type="datetime-local" defaultValue={inc.departureTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'departureTime', e.target.value)} />
+                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 700 }}>DROP-OFF</div>
+                                    <input type="datetime-local" defaultValue={inc.arrivalTime ?? ''} style={{ ...inputStyle, fontSize: '0.75rem' }} onChange={e => handleEditTrip(inc.id, 'arrivalTime', e.target.value)} />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>{inc.date}</div>
+                                    {inc.departureTime && inc.arrivalTime ? <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}><Clock size={10} /> {getTripDuration(inc.departureTime, inc.arrivalTime)}</div> : null}
+                                  </>
+                                )}
                               </td>
                               <td>
                                 {isEditing ? (
