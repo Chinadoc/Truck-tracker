@@ -147,6 +147,25 @@ const INITIAL_PERSONAL: PersonalExpense[] = [
   { id: 'p4', category: 'Phone', description: 'Mobile Phone', monthlyAmount: 100 },
   { id: 'p5', category: 'Food', description: 'Food & Groceries', monthlyAmount: 1200 },
   { id: 'p6', category: 'Clothing', description: 'Clothing', monthlyAmount: 200 },
+  { id: 'p7', category: 'Debt', description: 'Debt Payments', monthlyAmount: 1000 },
+];
+
+// === PERSONAL DEBTS ===
+type Debt = {
+  id: string;
+  to: string;
+  amount: number;
+  dateBorrowed: string;
+  dueDate?: string;
+  notes?: string;
+};
+
+const INITIAL_DEBTS: Debt[] = [
+  { id: 'd1', to: 'Cousin', amount: 3500, dateBorrowed: '2023', dueDate: '2024', notes: 'Overdue' },
+  { id: 'd2', to: 'Person in Afghanistan', amount: 4000, dateBorrowed: '2022', dueDate: '2023', notes: 'Oldest — overdue' },
+  { id: 'd3', to: 'Fellow Truck Driver', amount: 4000, dateBorrowed: '2024', notes: '' },
+  { id: 'd4', to: 'Person #4', amount: 1000, dateBorrowed: '2024', notes: '' },
+  { id: 'd5', to: 'Person #5', amount: 2000, dateBorrowed: '2024', notes: '' },
 ];
 
 // === REAL TRIP DATA ===
@@ -290,11 +309,19 @@ function App() {
   // Future/pending trip check
   const isFutureTrip = (date: string) => new Date(date) > new Date();
 
-  // Derived
-  const totalIncome = useMemo(() => incomes.reduce((s, i) => s + i.totalPayout, 0), [incomes]);
+  // Derived — EXCLUDE pending (future) trips from revenue
+  const completedIncomes = useMemo(() => incomes.filter(i => !isFutureTrip(i.date)), [incomes]);
+  const pendingIncomes = useMemo(() => incomes.filter(i => isFutureTrip(i.date)), [incomes]);
+  const totalIncome = useMemo(() => completedIncomes.reduce((s, i) => s + i.totalPayout, 0), [completedIncomes]);
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const totalMiles = useMemo(() => incomes.reduce((s, i) => s + i.distance, 0), [incomes]);
-  const totalDeadhead = useMemo(() => incomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [incomes]);
+  const totalMiles = useMemo(() => completedIncomes.reduce((s, i) => s + i.distance, 0), [completedIncomes]);
+  const totalDeadhead = useMemo(() => completedIncomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [completedIncomes]);
+  const pendingRevenue = useMemo(() => pendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [pendingIncomes]);
+
+  // Debts
+  const [debts, setDebts] = useState<Debt[]>(() => loadState('rl_debts', INITIAL_DEBTS));
+  useEffect(() => { localStorage.setItem('rl_debts', JSON.stringify(debts)); }, [debts]);
+  const totalDebt = useMemo(() => debts.reduce((s, d) => s + d.amount, 0), [debts]);
 
   const analysis = useMemo(() => {
     const expectedFuelCost = totalMiles * (REGIONAL_DIESEL['AVG'].price / MPG);
@@ -507,6 +534,7 @@ function App() {
                 <div className="stat-title text-success justify-center" style={{ marginBottom: '0.25rem' }}><TrendingUp size={14} /> Gross Revenue</div>
                 <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalIncome)}</div>
                 <div className="text-secondary" style={{ fontSize: '0.8rem' }}>{analysis.totalMiles.toLocaleString()} loaded mi + {totalDeadhead} deadhead</div>
+                {pendingRevenue > 0 && <div style={{ fontSize: '0.7rem', color: '#eab308', marginTop: '0.2rem' }}>+ {formatCurrency(pendingRevenue)} pending ({pendingIncomes.length} trip{pendingIncomes.length > 1 ? 's' : ''})</div>}
               </div>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}><TrendingDown size={14} /> Total True Costs</div>
@@ -1083,6 +1111,39 @@ function App() {
                   <div style={{ fontWeight: 800, marginTop: '0.25rem' }}>{Math.ceil(Math.ceil((totalPersonalMonthly + totalExpenses + analysis.totalHiddenCosts) / (totalIncome / Math.max(1, analysis.totalMiles))) / (analysis.totalMiles / Math.max(1, incomes.length)))}</div>
                   <div className="text-secondary" style={{ fontSize: '0.6rem' }}>at avg trip length</div>
                 </div>
+              </div>
+            </div>
+
+            {/* Debt Tracker */}
+            <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid var(--danger)' }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--danger)' }}>Outstanding Debts</span>
+                <span style={{ fontSize: '1.1rem' }}>{formatCurrency(totalDebt)}</span>
+              </h3>
+              <div className="table-container">
+                <table>
+                  <thead><tr><th>Owed To</th><th>Amount</th><th>Since</th><th>Due</th><th>Status</th><th></th></tr></thead>
+                  <tbody>
+                    {debts.map(d => {
+                      const isOverdue = d.dueDate && Number(d.dueDate) < new Date().getFullYear();
+                      return (
+                        <tr key={d.id}>
+                          <td style={{ fontWeight: 700 }}>{d.to}</td>
+                          <td className="text-danger" style={{ fontWeight: 700 }}>{formatCurrency(d.amount)}</td>
+                          <td className="text-secondary">{d.dateBorrowed}</td>
+                          <td>{d.dueDate || '\u2014'}</td>
+                          <td>{isOverdue ? <span style={{ fontSize: '0.7rem', background: 'rgba(239,68,68,0.15)', color: 'var(--danger)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>OVERDUE</span> : <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Active</span>}</td>
+                          <td><button className="btn-icon text-success" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }} onClick={() => { const amt = prompt(`How much to pay off for ${d.to}?`, String(d.amount)); if (amt) { const pay = Number(amt); setDebts(prev => prev.map(dd => dd.id === d.id ? { ...dd, amount: Math.max(0, dd.amount - pay) } : dd).filter(dd => dd.amount > 0)); } }}>Pay</button></td>
+                        </tr>
+                      );
+                    })}
+                    <tr style={{ borderTop: '2px solid var(--border)' }}>
+                      <td style={{ fontWeight: 800 }}>TOTAL DEBT</td>
+                      <td style={{ fontWeight: 800 }} className="text-danger">{formatCurrency(totalDebt)}</td>
+                      <td colSpan={4} className="text-secondary" style={{ fontSize: '0.75rem' }}>At $1,000/mo → paid off in ~{Math.ceil(totalDebt / 1000)} months ({new Date(Date.now() + Math.ceil(totalDebt / 1000) * 30 * 86400000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
