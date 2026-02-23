@@ -81,6 +81,7 @@ const PS: Record<string, string> = {
   'Seasonal Rate Outlook': 'فصلي نرخ چشم انداز',
   'Income vs Expenses (Monthly)': 'عاید مقابل لګښتونه (میاشتنی)',
   'Where Your Revenue Goes': 'ستاسو عاید چیرته ځي',
+  'Monthly Rate History': 'میاشتنی نرخ تاریخ',
 };
 const bi = (en: string) => <>{en} <span style={{ fontSize: '0.65em', opacity: 0.6, fontFamily: 'system-ui' }}>{PS[en] ?? ''}</span></>;
 
@@ -90,10 +91,14 @@ const FED_TAX_RATE = 0.12; // estimated federal bracket
 // const TOTAL_TAX_RATE = SE_TAX_RATE + FED_TAX_RATE; // ~27.3% - This is now defined above as a fixed value
 
 // Seasonal rate multipliers (spot market averages)
-const SEASONAL_RATES: Record<string, { label: string; multiplier: number; months: string }> = {
-  low: { label: 'Low Season (Feb-May)', multiplier: 0.85, months: '02,03,04,05' },
-  mid: { label: 'Shoulder (Jun-Sep)', multiplier: 1.0, months: '06,07,08,09' },
-  high: { label: 'Peak Season (Oct-Jan)', multiplier: 1.20, months: '10,11,12,01' },
+// Monthly historical average dry van rates ($/mi, national avg)
+const MONTHLY_AVG_RATES: Record<string, { rate: number; label: string }> = {
+  '01': { rate: 2.35, label: 'Jan' }, '02': { rate: 2.10, label: 'Feb' },
+  '03': { rate: 2.15, label: 'Mar' }, '04': { rate: 2.20, label: 'Apr' },
+  '05': { rate: 2.25, label: 'May' }, '06': { rate: 2.40, label: 'Jun' },
+  '07': { rate: 2.45, label: 'Jul' }, '08': { rate: 2.50, label: 'Aug' },
+  '09': { rate: 2.55, label: 'Sep' }, '10': { rate: 2.65, label: 'Oct' },
+  '11': { rate: 2.70, label: 'Nov' }, '12': { rate: 2.80, label: 'Dec' },
 };
 
 // Regional diesel prices ($/gal, Feb 2026 estimates)
@@ -393,15 +398,15 @@ function App() {
     const estimatedTax = Math.max(0, ownerOperatorTrueProfit) * TOTAL_TAX_RATE;
     const afterTaxProfit = ownerOperatorTrueProfit - estimatedTax;
     // Seasonal projections
-    const currentMonth = new Date().toISOString().substring(5, 7);
-    const currentSeason = Object.values(SEASONAL_RATES).find(s => s.months.includes(currentMonth)) ?? SEASONAL_RATES.mid;
+    const currentMonth = new Date().toISOString().slice(5, 7);
+    const currentMonthRate = MONTHLY_AVG_RATES[currentMonth] ?? MONTHLY_AVG_RATES['02'];
     const annualMilesProjection = totalMiles * (12 / Math.max(1, incomes.length > 0 ? new Set(incomes.map(i => i.date.substring(0, 7))).size : 1));
     return {
       totalMiles, expectedFuelCost, trackedFuelCost, maintReserve,
       vehicleDepreciation, totalHiddenCosts, ownerOperatorCashProfit,
       ownerOperatorTrueProfit, companyEquivalentEarnings,
       isBeatingCompanyRate: ownerOperatorTrueProfit > companyEquivalentEarnings,
-      estimatedTax, afterTaxProfit, currentSeason, annualMilesProjection,
+      estimatedTax, afterTaxProfit, currentMonthRate, annualMilesProjection,
     };
   }, [totalIncome, totalExpenses, totalMiles, expenses, incomes]);
 
@@ -771,19 +776,19 @@ function App() {
             {/* Revenue Waterfall — Money Flow Animation */}
             {(() => {
               const bizExpenses = totalExpenses + analysis.totalHiddenCosts;
-              const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
-              const personalCosts = totalPersonalMonthly - debtPayment;
+              // Personal already includes debt ($5,800 has $1,000 debt inside)
+              // Show personal as the full amount; debt meter tracks payoff progress separately
+              const personalCosts = totalPersonalMonthly; // $5,800 total (rent+food+phone+debt)
               const taxCosts = analysis.estimatedTax;
               const afterBiz = totalIncome - bizExpenses;
               const afterPersonal = afterBiz - personalCosts;
               const afterTax = afterPersonal - taxCosts;
-              const afterDebt = afterTax - debtPayment;
+              const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
                 { label: '🏢 Business', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls', delay: '0s' },
-                { label: '🏠 Personal', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: 'Housing · Family · Food · Utilities', delay: '0.4s' },
+                { label: '🏠 Personal + Debt', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.4s' },
                 { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE ${(SE_TAX_RATE * 100).toFixed(0)}% + Fed ~${(FED_TAX_RATE * 100).toFixed(0)}%`, delay: '0.8s' },
-                { label: '💳 Debt Payoff', amount: debtPayment, filled: Math.max(0, Math.min(afterTax, debtPayment)), color: '#a855f7', details: `${formatCurrency(totalDebt)} remaining`, delay: '1.2s' },
-                { label: '💰 Profit', amount: Math.max(0, afterDebt), filled: Math.max(0, afterDebt), color: '#10b981', details: afterDebt >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.6s' },
+                { label: '💰 Surplus', amount: Math.max(0, afterTax), filled: Math.max(0, afterTax), color: '#10b981', details: afterTax >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
               ];
 
               // Reserve fund targets — how much you SHOULD be saving
@@ -824,11 +829,11 @@ function App() {
                         <div key={i} style={{ width: `${pct}%`, background: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>{pct > 8 ? `${pct.toFixed(0)}%` : ''}</div>
                       ) : null;
                     })}
-                    {afterDebt < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
+                    {afterTax < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
                   </div>
 
-                  {/* Bucket columns — 5 */}
-                  <div className="grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.6rem' }}>
+                  {/* Bucket columns — 4 */}
+                  <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
                     {buckets.map((b, i) => {
                       const fillPct = b.amount > 0 ? Math.min(100, (b.filled / b.amount) * 100) : 0;
                       const isFunded = b.filled >= b.amount && b.amount > 0;
@@ -843,7 +848,7 @@ function App() {
                           </div>
                           <div style={{ marginTop: '0.4rem', fontSize: '0.7rem', fontWeight: 700 }}>{b.label}</div>
                           <div style={{ fontSize: '0.5rem', color: b.color, marginTop: '0.15rem' }}>
-                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : i === 4 ? (afterDebt >= 0 ? '✓ Take home' : formatCurrency(afterDebt)) : '✗ Empty'}
+                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : i === 3 ? (afterTax >= 0 ? '✓ Take home' : formatCurrency(afterTax)) : '✗ Empty'}
                           </div>
                         </div>
                       );
@@ -895,11 +900,11 @@ function App() {
                   </div>
 
                   {/* Summary line */}
-                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: afterDebt >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '10px', border: `1px solid ${afterDebt >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: afterDebt >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                      {afterDebt >= 0 ? '✓ All buckets funded — profit remaining' : `⚠ ${formatCurrency(Math.abs(afterDebt))} short — need more loads or cut expenses`}
+                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: afterTax >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '10px', border: `1px solid ${afterTax >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {afterTax >= 0 ? '✓ All buckets funded — surplus remaining' : `⚠ ${formatCurrency(Math.abs(afterTax))} short — need more loads or cut expenses`}
                     </span>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: afterDebt >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(afterDebt)}</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: afterTax >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(afterTax)}</span>
                   </div>
                 </div>
               );
@@ -954,30 +959,33 @@ function App() {
                 <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Set aside ~{(TOTAL_TAX_RATE * 100).toFixed(1)}% of true profit for quarterly 1099-NEC estimated payments.</div>
               </div>
 
-              {/* Seasonal Projections */}
+              {/* Monthly Historical Rate Averages */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <TrendingUp size={18} style={{ color: '#eab308' }} /> {bi('Seasonal Rate Outlook')}
+                  <TrendingUp size={18} style={{ color: '#eab308' }} /> {bi('Monthly Rate History')}
                 </h3>
                 <div style={{ background: 'rgba(234,179,8,0.08)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(234,179,8,0.3)', marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Current: {analysis.currentSeason.label}</div>
-                  <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>Rates are ~{((analysis.currentSeason.multiplier - 1) * 100).toFixed(0)}% {analysis.currentSeason.multiplier >= 1 ? 'above' : 'below'} average</div>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Your Rate: ${(totalIncome / Math.max(1, totalMiles)).toFixed(2)}/mi vs National Avg: ${analysis.currentMonthRate.rate.toFixed(2)}/mi ({analysis.currentMonthRate.label})</div>
+                  <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{(totalIncome / Math.max(1, totalMiles)) >= analysis.currentMonthRate.rate ? '✓ You\'re above the national average' : '⚠ Below national average for this month'}</div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-                  {Object.entries(SEASONAL_RATES).map(([key, s]) => {
-                    const avgRate = totalIncome / Math.max(1, totalMiles);
-                    const projRate = avgRate * s.multiplier / (analysis.currentSeason.multiplier || 1);
-                    const projRevenue = analysis.annualMilesProjection / 3 * projRate;
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '0.25rem' }}>
+                  {Object.entries(MONTHLY_AVG_RATES).map(([month, data]) => {
+                    const currentMonth = new Date().toISOString().slice(5, 7);
+                    const isCurrent = month === currentMonth;
+                    const maxRate = Math.max(...Object.values(MONTHLY_AVG_RATES).map(d => d.rate));
+                    const barPct = (data.rate / maxRate) * 100;
                     return (
-                      <div key={key} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>{s.label.split('(')[0]}</div>
-                        <div style={{ fontSize: '1rem', fontWeight: 800, color: s.multiplier >= 1 ? 'var(--success)' : 'var(--danger)', marginTop: '0.2rem' }}>${projRate.toFixed(2)}/mi</div>
-                        <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>~{formatCurrency(projRevenue)} rev</div>
+                      <div key={month} style={{ textAlign: 'center' }}>
+                        <div style={{ height: '60px', position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+                          <div style={{ width: '100%', height: `${barPct}%`, background: isCurrent ? '#eab308' : 'rgba(255,255,255,0.1)', borderRadius: '3px 3px 0 0', border: isCurrent ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.05)', transition: 'height 1s ease-out' }} />
+                        </div>
+                        <div style={{ fontSize: '0.5rem', fontWeight: isCurrent ? 800 : 600, color: isCurrent ? '#eab308' : 'var(--text-secondary)', marginTop: '0.2rem' }}>{data.label}</div>
+                        <div style={{ fontSize: '0.45rem', color: isCurrent ? '#eab308' : 'var(--text-secondary)' }}>${data.rate.toFixed(2)}</div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Peak season (Oct-Jan) typically sees 15-20% higher spot rates. Plan to save during peaks for low-season dips.</div>
+                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>National avg dry van spot rates by month. Oct-Jan peak, Feb-May dip. Your rate adjusts with lane demand.</div>
               </div>
             </div>
 
