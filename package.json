@@ -12,9 +12,12 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-leaflet": "^5.0.0",
     "recharts": "^3.7.0",
     "uuid": "^13.0.0"
   },
