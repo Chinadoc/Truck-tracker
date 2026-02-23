@@ -8,8 +8,15 @@ import {
   TrendingDown,
   Plus,
   Trash2,
-  X
+  X,
+  Calculator,
+  Scale
 } from 'lucide-react';
+
+const COMPANY_DRIVER_RATE = 0.65;
+const TIRE_DEPRECIATION_RATE = 0.03;
+const MAINT_RESERVE_RATE = 0.07;
+const VEHICLE_DEPRECIATION_RATE = 0.17;
 import {
   BarChart,
   Bar,
@@ -56,7 +63,32 @@ function App() {
   // Derived Data
   const totalIncome = useMemo(() => incomes.reduce((sum, item) => sum + item.totalPayout, 0), [incomes]);
   const totalExpenses = useMemo(() => expenses.reduce((sum, item) => sum + item.amount, 0), [expenses]);
+  const totalMiles = useMemo(() => incomes.reduce((sum, item) => sum + item.distance, 0), [incomes]);
   const netProfit = totalIncome - totalExpenses;
+
+  // Analysis Data
+  const analysis = useMemo(() => {
+    const tireDepreciation = totalMiles * TIRE_DEPRECIATION_RATE;
+    const maintReserve = totalMiles * MAINT_RESERVE_RATE;
+    const vehicleDepreciation = totalMiles * VEHICLE_DEPRECIATION_RATE;
+    const totalHiddenCosts = tireDepreciation + maintReserve + vehicleDepreciation;
+
+    const ownerOperatorCashProfit = totalIncome - totalExpenses;
+    const ownerOperatorTrueProfit = ownerOperatorCashProfit - totalHiddenCosts;
+    const companyEquivalentEarnings = totalMiles * COMPANY_DRIVER_RATE;
+
+    return {
+      totalMiles,
+      tireDepreciation,
+      maintReserve,
+      vehicleDepreciation,
+      totalHiddenCosts,
+      ownerOperatorCashProfit,
+      ownerOperatorTrueProfit,
+      companyEquivalentEarnings,
+      isBeatingCompanyRate: ownerOperatorTrueProfit > companyEquivalentEarnings
+    };
+  }, [totalIncome, totalExpenses, totalMiles]);
 
   // Chart Data Preparation (Grouping by Month - simple version)
   const chartData = useMemo(() => {
@@ -166,29 +198,107 @@ function App() {
 
             {/* Metrics Grid */}
             <div className="dashboard-grid">
-              <div className="glass-panel stat-card">
-                <div className="stat-title text-success">
-                  <TrendingUp size={16} /> Total Revenue
+              <div className="glass-panel stat-card text-center">
+                <div className="stat-title text-success justify-center">
+                  <TrendingUp size={16} /> Cash Revenue
                 </div>
                 <div className="stat-value">{formatCurrency(totalIncome)}</div>
+                <div className="text-secondary text-sm mt-1">Gross Earnings</div>
               </div>
-              <div className="glass-panel stat-card">
-                <div className="stat-title text-danger">
-                  <TrendingDown size={16} /> Total Expenses
+              <div className="glass-panel stat-card text-center">
+                <div className="stat-title text-danger justify-center">
+                  <TrendingDown size={16} /> Cash Expenses
                 </div>
                 <div className="stat-value">{formatCurrency(totalExpenses)}</div>
+                <div className="text-secondary text-sm mt-1">Out-of-Pocket</div>
               </div>
-              <div className="glass-panel stat-card" style={{ borderTop: `4px solid ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
-                <div className="stat-title" style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  <DollarSign size={16} /> Net Profit
+              <div className="glass-panel stat-card text-center" style={{ borderTop: `4px solid ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
+                <div className="stat-title justify-center" style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  <DollarSign size={16} /> Take-Home Pay
                 </div>
                 <div className="stat-value">{formatCurrency(netProfit)}</div>
+                <div className="text-secondary text-sm mt-1">Cash Profit</div>
+              </div>
+            </div>
+
+            {/* Trip Cycle Analysis */}
+            <div className="glass-panel p-6 mb-8">
+              <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] pb-4">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Calculator size={24} className="text-accent" />
+                  Trip Cycle Financial Analysis
+                </h3>
+                <div className={`px-4 py-2 rounded-full text-sm font-bold border ${analysis.isBeatingCompanyRate ? 'bg-[rgba(16,185,129,0.1)] text-success border-success' : 'bg-[rgba(239,68,68,0.1)] text-danger border-danger'}`}>
+                  {analysis.isBeatingCompanyRate ? 'Beating Company Rate' : 'Below Company Rate'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4">
+                {/* Column 1: True Profit */}
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Owner-Operator (True Net)</p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2">
+                      <span className="text-secondary">Cash Profit:</span>
+                      <span className="font-bold text-success text-base">{formatCurrency(analysis.ownerOperatorCashProfit)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2 text-danger opacity-90">
+                      <span>Vehicle Depr. ($0.17/mi):</span>
+                      <span>-{formatCurrency(analysis.vehicleDepreciation)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm border-b border-[var(--border)] pb-2 text-danger opacity-80">
+                      <span>Tires & Maint ($0.10/mi):</span>
+                      <span>-{formatCurrency(analysis.tireDepreciation + analysis.maintReserve)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-lg font-bold pt-2">
+                      <span>True Profit:</span>
+                      <span className="text-accent">{formatCurrency(analysis.ownerOperatorTrueProfit)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Old Company Equivalent */}
+                <div className="bg-[rgba(0,0,0,0.2)] p-6 rounded-xl border border-[var(--border)] flex flex-col gap-4">
+                  <p className="text-sm font-semibold text-secondary uppercase tracking-wider">Old Company Equivalent</p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-secondary">Total Miles:</span>
+                      <span className="font-bold text-base">{analysis.totalMiles.toLocaleString()} mi</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-secondary">Old Rate:</span>
+                      <span className="font-bold text-base">${COMPANY_DRIVER_RATE.toFixed(2)}/mi</span>
+                    </div>
+                    <div className="flex justify-between items-center text-lg font-bold pt-4 border-t border-[var(--border)]">
+                      <span className="text-secondary">Old Earnings:</span>
+                      <span>{formatCurrency(analysis.companyEquivalentEarnings)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-[var(--surface-hover)] rounded-xl border-l-4 border-accent flex items-start gap-4">
+                <div className="pt-1"><Scale size={24} className="text-accent" /></div>
+                <div>
+                  <h4 className="font-bold mb-1">Hidden Costs Breakdown</h4>
+                  <p className="text-sm text-secondary mb-3">Based on an estimated $85,000 purchase price, your truck loses value every mile:</p>
+                  <div className="flex gap-4 flex-wrap">
+                    <div className="bg-[rgba(0,0,0,0.3)] px-3 py-2 rounded-lg border border-[var(--border)]">
+                      <span className="text-xs uppercase text-secondary block mb-1">Asset Depr.</span>
+                      <span className="font-semibold text-danger">-{formatCurrency(analysis.vehicleDepreciation)}</span>
+                    </div>
+                    <div className="bg-[rgba(0,0,0,0.3)] px-3 py-2 rounded-lg border border-[var(--border)]">
+                      <span className="text-xs uppercase text-secondary block mb-1">Reserves</span>
+                      <span className="font-semibold text-danger">-{formatCurrency(analysis.tireDepreciation + analysis.maintReserve)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Main Chart */}
             <div className="glass-panel chart-container">
-              <h3 className="mb-4 font-semibold text-lg">Income vs Expenses (Monthly)</h3>
+              <h3 className="mb-4 font-semibold text-lg flex items-center gap-2">Income vs Expenses (Monthly)</h3>
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="90%">
                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
