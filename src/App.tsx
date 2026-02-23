@@ -543,7 +543,7 @@ function App() {
             })()}
 
             {/* Row 1: Big Picture */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-success justify-center" style={{ marginBottom: '0.25rem' }}><TrendingUp size={14} /> Gross Revenue</div>
                 <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalIncome)}</div>
@@ -563,7 +563,7 @@ function App() {
             </div>
 
             {/* Row 2: Two panels */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            <div className="grid-2-1" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
               {/* LEFT: Per-Mile & Buckets */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -701,7 +701,7 @@ function App() {
                   </div>
 
                   {/* Bucket columns — 5 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.6rem' }}>
+                  <div className="grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.6rem' }}>
                     {buckets.map((b, i) => {
                       const fillPct = b.amount > 0 ? Math.min(100, (b.filled / b.amount) * 100) : 0;
                       const isFunded = b.filled >= b.amount && b.amount > 0;
@@ -779,7 +779,7 @@ function App() {
             })()}
 
             {/* Compact Expense Breakdown on Dashboard */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
+            <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
               {[
                 { label: '🛡 Insurance', val: '$2,400/mo', type: 'fixed' },
                 { label: '🚛 Trailer', val: '$600/mo', type: 'fixed' },
@@ -800,7 +800,7 @@ function App() {
             </div>
 
             {/* Row 3: Tax & Seasonal */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
               {/* Tax Estimate */}
               <div className="glass-panel" style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
