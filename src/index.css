@@ -446,6 +446,20 @@ tr:hover td {
     display: none;
   }
 
+  .sidebar .sync-indicator {
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    font-size: 0.5rem;
+    z-index: 10;
+  }
+
+  .sidebar .sync-text {
+    display: none;
+  }
+
   .nav-links {
     flex-direction: row;
     width: 100%;

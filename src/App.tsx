@@ -778,8 +778,9 @@ function App() {
       {/* Sidebar */}
       <aside className="sidebar glass-panel" style={{ borderRadius: 0, borderTop: 0, borderBottom: 0, borderLeft: 0 }}>
         <div className="brand"><Truck size={28} className="text-accent" /><span>Road Ledger</span></div>
-        <div style={{ fontSize: '0.6rem', textAlign: 'center', marginTop: '0.25rem', color: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'syncing' ? '#eab308' : syncStatus === 'error' ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: 600 }}>
-          {syncStatus === 'synced' ? '🟢 Synced' : syncStatus === 'syncing' ? '🟡 Syncing...' : syncStatus === 'error' ? '🔴 Offline' : '⚪ Local'}
+        <div className="sync-indicator" style={{ fontSize: '0.6rem', textAlign: 'center', marginTop: '0.25rem', color: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'syncing' ? '#eab308' : syncStatus === 'error' ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: 600 }}>
+          <span className="sync-dot">{syncStatus === 'synced' ? '🟢' : syncStatus === 'syncing' ? '🟡' : syncStatus === 'error' ? '🔴' : '⚪'}</span>
+          <span className="sync-text">{syncStatus === 'synced' ? ' Synced' : syncStatus === 'syncing' ? ' Syncing...' : syncStatus === 'error' ? ' Offline' : ' Local'}</span>
         </div>
         <nav className="nav-links mt-8">
           {([
@@ -1013,18 +1014,26 @@ function App() {
 
             {/* Revenue Waterfall — Money Flow Animation */}
             {(() => {
-              const bizExpenses = totalExpenses + analysis.totalHiddenCosts;
+              // Split business expenses into Fixed and Variable
+              const fixedCategories = new Set(['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer']);
+              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch', 'Food']);
+              const fixedExpenses = completedExpenses.filter(e => fixedCategories.has(e.category)).reduce((s, e) => s + e.amount, 0);
+              const variableExpenses = completedExpenses.filter(e => variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0)
+                + analysis.totalHiddenCosts; // depreciation + maintenance are variable (per-mile)
+              const otherBizExpenses = completedExpenses.filter(e => !fixedCategories.has(e.category) && !variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0);
               const taxCosts = analysis.estimatedTax;
-              const personalCosts = totalPersonalMonthly; // $5,800 total (rent+food+phone+debt)
-              // Priority: Business → Taxes → Personal → Surplus (IRS before lifestyle)
-              const afterBiz = totalIncome - bizExpenses;
-              const afterTax = afterBiz - taxCosts;
+              const personalCosts = totalPersonalMonthly;
+              // Priority: Fixed → Variable → Taxes → Personal → Surplus
+              const afterFixed = totalIncome - fixedExpenses;
+              const afterVariable = afterFixed - variableExpenses - otherBizExpenses;
+              const afterTax = afterVariable - taxCosts;
               const afterPersonal = afterTax - personalCosts;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
-                { label: '🏢 Business', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls', delay: '0s' },
-                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterBiz, taxCosts)), color: '#f97316', details: `SE only (~${(analysis.taxCalc.effectiveRate * 100).toFixed(1)}%) · CTC covers federal`, delay: '0.4s' },
-                { label: '🏠 Personal + Debt', amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.8s' },
+                { label: '🏢 Fixed Costs', amount: fixedExpenses, filled: Math.min(totalIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Tolls · Lock Box · Registration', delay: '0s' },
+                { label: '📊 Variable Costs', amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Depreciation · Maint · Food', delay: '0.3s' },
+                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only (~${(analysis.taxCalc.effectiveRate * 100).toFixed(1)}%) · CTC covers federal`, delay: '0.6s' },
+                { label: '🏠 Personal + Debt', amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
                 { label: '💰 Surplus', amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
               ];
 
