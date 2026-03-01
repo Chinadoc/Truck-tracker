@@ -449,7 +449,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 5;
+const DATA_VERSION = 6;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
@@ -940,7 +940,7 @@ function App() {
               // Reserve fund targets — how much you SHOULD be saving
               const truckTarget = 85000; // replacement cost
               const truckLifetimeSaved = totalMiles * CASCADIA_DEPR_RATE; // total set aside
-              const tireTarget = 4500; // full tire set cost
+              const tireTarget = TIRE_SET_COST; // full tire set cost
               const tireLifetimeSaved = totalMiles * CASCADIA_MAINT_RESERVE;
 
               const CircleFill = ({ pct, color, size, icon }: { pct: number; color: string; size: number; icon: string }) => {
