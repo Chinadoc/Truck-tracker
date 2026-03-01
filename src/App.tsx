@@ -570,7 +570,8 @@ function App() {
     const totalPayout = Number(fd.get('totalPayout'));
     const originCity = (fd.get('originCity') as string) || '';
     const destCity = (fd.get('destCity') as string) || '';
-    const fuelCost = Number(fd.get('fuelCost') || 0);
+    const fuelPricePerGal = Number(fd.get('fuelPricePerGal') || 0);
+    const fuelCost = fuelPricePerGal > 0 ? Math.round((distance / MPG) * fuelPricePerGal * 100) / 100 : 0;
     const tripDate = fd.get('date') as string;
     const tripId = uuidv4();
     setIncomes([...incomes, {
@@ -1267,15 +1268,16 @@ function App() {
                               <td>{isEditing ? <input type="number" defaultValue={inc.distance} style={{ ...inputStyle, width: '70px' }} onChange={e => handleEditTrip(inc.id, 'distance', Number(e.target.value))} /> : inc.distance.toLocaleString()}</td>
                               <td>{formatCurrency(inc.ratePerMile)}</td>
                               <td>{isEditing ? <input type="number" step="0.01" defaultValue={inc.totalPayout} style={{ ...inputStyle, width: '80px' }} onChange={e => handleEditTrip(inc.id, 'totalPayout', Number(e.target.value))} /> : <span className="text-success font-semibold">{formatCurrency(inc.totalPayout)}</span>}</td>
-                              <td className="text-danger">{isEditing ? <input type="number" step="0.01" defaultValue={Math.round(tripFuel * 100) / 100} style={{ ...inputStyle, width: '80px' }} onChange={e => {
-                                const newFuel = Number(e.target.value);
+                              <td className="text-danger">{isEditing ? <><input type="number" step="0.01" defaultValue={Math.round((tripFuel > 0 && inc.distance > 0 ? tripFuel / (inc.distance / MPG) : 0) * 100) / 100} style={{ ...inputStyle, width: '65px' }} placeholder="$/gal" onChange={e => {
+                                const pricePerGal = Number(e.target.value);
+                                const totalFuel = Math.round((inc.distance / MPG) * pricePerGal * 100) / 100;
                                 const fuelExpId = `fuel-${inc.id}`;
                                 setExpenses(prev => {
                                   const existing = prev.find(ex => ex.id === fuelExpId);
-                                  if (existing) return prev.map(ex => ex.id === fuelExpId ? { ...ex, amount: newFuel } : ex);
-                                  return [...prev, { id: fuelExpId, date: inc.date, category: 'Fuel' as const, description: `Fuel: ${inc.originCity ?? ''} → ${inc.destCity ?? ''}`, amount: newFuel }];
+                                  if (existing) return prev.map(ex => ex.id === fuelExpId ? { ...ex, amount: totalFuel } : ex);
+                                  return [...prev, { id: fuelExpId, date: inc.date, category: 'Fuel' as const, description: `Fuel: ${inc.originCity ?? ''} → ${inc.destCity ?? ''}`, amount: totalFuel }];
                                 });
-                              }} /> : formatCurrency(tripFuel)}</td>
+                              }} /><span style={{ fontSize: '0.55rem', opacity: 0.5 }}>/gal</span></> : formatCurrency(tripFuel)}</td>
                               <td style={{ color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(tripTrueNet)}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -2103,7 +2105,7 @@ function App() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="form-group"><label>Distance (Miles)</label><input type="number" name="distance" min="1" required placeholder="850" /></div>
                 <div className="form-group"><label>Total Payout ($)</label><input type="number" step="0.01" min="0" name="totalPayout" required placeholder="2500.00" /></div>
-                <div className="form-group"><label>Fuel Cost ($)</label><input type="number" step="0.01" min="0" name="fuelCost" placeholder="0.00" /></div>
+                <div className="form-group"><label>Fuel Price ($/gal)</label><input type="number" step="0.01" min="0" name="fuelPricePerGal" placeholder="3.85" /></div>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
                 <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Optional</div>
