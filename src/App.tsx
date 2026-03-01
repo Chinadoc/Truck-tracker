@@ -184,7 +184,54 @@ const TIRE_SET_COST = 4000;       // 18 tires, full set
 const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
 const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
-const TOTAL_TAX_RATE = 0.273;
+// === TAX CALCULATION (MFJ, 10 dependent children, self-employed 1099) ===
+const NUM_DEPENDENTS = 10; // all under 17 in 2026
+const CTC_PER_CHILD = 2000; // Child Tax Credit per qualifying child
+const STANDARD_DEDUCTION_MFJ = 31400; // 2026 estimated MFJ
+const QBI_RATE = 0.20; // Qualified Business Income deduction (20%)
+const SE_TAX_RATE = 0.153; // 15.3% (SS 12.4% + Medicare 2.9%)
+const DEBT_SAVINGS_RATE = 0.04; // 4% of revenue toward debt
+
+// 2026 Federal Tax Brackets (MFJ)
+const FED_BRACKETS: [number, number][] = [
+  [23200, 0.10], [71600, 0.12], [136150, 0.22],
+  [213750, 0.24], [321450, 0.32], [428200, 0.35], [Infinity, 0.37],
+];
+
+const calculateTax = (netSEIncome: number) => {
+  if (netSEIncome <= 0) return { seTax: 0, federalTax: 0, ctc: 0, totalTax: 0, effectiveRate: 0 };
+
+  // 1. Self-employment tax (on 92.35% of net SE income)
+  const seTaxableIncome = netSEIncome * 0.9235;
+  const seTax = seTaxableIncome * SE_TAX_RATE;
+
+  // 2. Adjusted Gross Income
+  const halfSE = seTax / 2; // above-the-line deduction
+  const qbiDeduction = netSEIncome * QBI_RATE;
+  const taxableIncome = Math.max(0, netSEIncome - halfSE - STANDARD_DEDUCTION_MFJ - qbiDeduction);
+
+  // 3. Federal tax from brackets
+  let federalTax = 0;
+  let remaining = taxableIncome;
+  let prevCutoff = 0;
+  for (const [cutoff, rate] of FED_BRACKETS) {
+    const bracketSize = cutoff - prevCutoff;
+    const taxable = Math.min(remaining, bracketSize);
+    federalTax += taxable * rate;
+    remaining -= taxable;
+    prevCutoff = cutoff;
+    if (remaining <= 0) break;
+  }
+
+  // 4. Child Tax Credit (non-refundable portion floors at $0)
+  const ctc = NUM_DEPENDENTS * CTC_PER_CHILD;
+  const federalAfterCTC = Math.max(0, federalTax - ctc);
+
+  const totalTax = seTax + federalAfterCTC;
+  const effectiveRate = netSEIncome > 0 ? totalTax / netSEIncome : 0;
+
+  return { seTax, federalTax: federalAfterCTC, ctc: Math.min(ctc, federalTax), totalTax, effectiveRate };
+};
 
 // Pashto translations — bilingual labels
 const PS: Record<string, string> = {
@@ -215,11 +262,6 @@ const PS: Record<string, string> = {
   'Monthly Rate History': 'میاشتنی نرخ تاریخ',
 };
 const bi = (en: string) => <>{en} <span style={{ fontSize: '0.65em', opacity: 0.6, fontFamily: 'system-ui' }}>{PS[en] ?? ''}</span></>;
-
-// Tax constants (1099 self-employment)
-const SE_TAX_RATE = 0.153; // 15.3% (SS 12.4% + Medicare 2.9%)
-const FED_TAX_RATE = 0.12; // estimated federal bracket
-// const TOTAL_TAX_RATE = SE_TAX_RATE + FED_TAX_RATE; // ~27.3% - This is now defined above as a fixed value
 
 // Seasonal rate multipliers (spot market averages)
 // Monthly historical average dry van rates ($/mi, national avg)
@@ -525,8 +567,9 @@ function App() {
     const ownerOperatorCashProfit = totalIncome - totalExpenses;
     const ownerOperatorTrueProfit = ownerOperatorCashProfit - totalHiddenCosts;
     const companyEquivalentEarnings = totalMiles * COMPANY_DRIVER_RATE;
-    // Tax estimates (1099)
-    const estimatedTax = Math.max(0, ownerOperatorTrueProfit) * TOTAL_TAX_RATE;
+    // Tax estimates (1099 — MFJ w/ 10 dependents)
+    const taxCalc = calculateTax(Math.max(0, ownerOperatorTrueProfit));
+    const estimatedTax = taxCalc.totalTax;
     const afterTaxProfit = ownerOperatorTrueProfit - estimatedTax;
     // Seasonal projections
     const currentMonth = new Date().toISOString().slice(5, 7);
@@ -537,7 +580,7 @@ function App() {
       vehicleDepreciation, totalHiddenCosts, ownerOperatorCashProfit,
       ownerOperatorTrueProfit, companyEquivalentEarnings,
       isBeatingCompanyRate: ownerOperatorTrueProfit > companyEquivalentEarnings,
-      estimatedTax, afterTaxProfit, currentMonthRate, annualMilesProjection,
+      estimatedTax, afterTaxProfit, currentMonthRate, annualMilesProjection, taxCalc,
     };
   }, [totalIncome, totalExpenses, totalMiles, expenses, incomes]);
 
@@ -933,7 +976,7 @@ function App() {
               const buckets = [
                 { label: '🏢 Business', amount: bizExpenses, filled: Math.min(totalIncome, bizExpenses), color: '#ef4444', details: 'Fuel · Dispatch · Insurance · Trailer · Tolls', delay: '0s' },
                 { label: '🏠 Personal + Debt', amount: personalCosts, filled: Math.max(0, Math.min(afterBiz, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.4s' },
-                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE ${(SE_TAX_RATE * 100).toFixed(0)}% + Fed ~${(FED_TAX_RATE * 100).toFixed(0)}%`, delay: '0.8s' },
+                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterPersonal, taxCosts)), color: '#f97316', details: `SE only (~${(analysis.taxCalc.effectiveRate * 100).toFixed(1)}%) · CTC covers federal`, delay: '0.8s' },
                 { label: '💰 Surplus', amount: Math.max(0, afterTax), filled: Math.max(0, afterTax), color: '#10b981', details: afterTax >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
               ];
 
@@ -1087,22 +1130,22 @@ function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>SE Tax (15.3%)</div>
-                    <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(Math.max(0, analysis.ownerOperatorTrueProfit) * SE_TAX_RATE)}</div>
+                    <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(analysis.taxCalc.seTax)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(16,185,129,0.08)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--success)', fontWeight: 700 }}>Child Tax Credit ×{NUM_DEPENDENTS}</div>
+                    <div style={{ fontWeight: 700, marginTop: '0.25rem', color: 'var(--success)' }}>-{formatCurrency(analysis.taxCalc.ctc)} saved</div>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Federal (~12%)</div>
-                    <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(Math.max(0, analysis.ownerOperatorTrueProfit) * FED_TAX_RATE)}</div>
-                  </div>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Total Tax Reserve</div>
-                    <div className="text-danger" style={{ fontWeight: 800, fontSize: '1.1rem', marginTop: '0.25rem' }}>-{formatCurrency(analysis.estimatedTax)}</div>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>Federal Tax</div>
+                    <div style={{ fontWeight: 700, marginTop: '0.25rem', color: analysis.taxCalc.federalTax > 0 ? 'var(--danger)' : 'var(--success)' }}>{analysis.taxCalc.federalTax > 0 ? `-${formatCurrency(analysis.taxCalc.federalTax)}` : '$0.00 ✓'}</div>
                   </div>
                   <div style={{ background: analysis.afterTaxProfit >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', padding: '0.75rem', borderRadius: '10px', border: `1px solid ${analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
-                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>After-Tax Profit</div>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>Effective Rate: {(analysis.taxCalc.effectiveRate * 100).toFixed(1)}%</div>
                     <div style={{ fontWeight: 800, fontSize: '1.1rem', marginTop: '0.25rem', color: analysis.afterTaxProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(analysis.afterTaxProfit)}</div>
                   </div>
                 </div>
-                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Set aside ~{(TOTAL_TAX_RATE * 100).toFixed(1)}% of true profit for quarterly 1099-NEC estimated payments.</div>
+                <div className="text-secondary" style={{ fontSize: '0.7rem', marginTop: '0.75rem' }}>Set aside ~{(analysis.taxCalc.effectiveRate * 100).toFixed(1)}% of true profit for quarterly 1099-NEC estimated payments. CTC covers federal tax.</div>
               </div>
 
               {/* Monthly Historical Rate Averages */}
@@ -1200,7 +1243,8 @@ function App() {
 
                         const isEditing = editingTrip === inc.id;
                         const inputStyle = { background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.2rem 0.4rem', color: 'var(--text-primary)', width: '100%', fontSize: '0.85rem' } as const;
-                        const tripTax = Math.max(0, tripTrueNet) * TOTAL_TAX_RATE;
+                        const tripTaxCalc = calculateTax(Math.max(0, tripTrueNet));
+                        const tripTax = tripTaxCalc.totalTax;
 
                         return (
                           <React.Fragment key={inc.id}>
@@ -1351,7 +1395,7 @@ function App() {
                                       <div style={{ fontWeight: 800, marginTop: '0.25rem', fontSize: '1.1rem', color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(tripTrueNet)}</div>
                                     </div>
                                     <div style={{ background: 'rgba(239,68,68,0.06)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
-                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--danger)', fontWeight: 700 }}>1099 Tax (~{(TOTAL_TAX_RATE * 100).toFixed(0)}%)</div>
+                                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--danger)', fontWeight: 700 }}>1099 Tax (~{(tripTaxCalc.effectiveRate * 100).toFixed(0)}%)</div>
                                       <div className="text-danger" style={{ fontWeight: 700, marginTop: '0.25rem' }}>-{formatCurrency(tripTax)}</div>
                                       <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>After tax: {formatCurrency(tripTrueNet - tripTax)}</div>
                                     </div>
@@ -1625,7 +1669,8 @@ function App() {
                         const mOther = mExp.filter(e => e.category !== 'Fuel' && e.category !== 'Deadhead').reduce((s, e) => s + e.amount, 0);
                         const mHidden = mMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
                         const mProfit = mRevenue - mFuel - mOther - mHidden;
-                        const mTax = Math.max(0, mProfit) * TOTAL_TAX_RATE;
+                        const mTaxCalc = calculateTax(Math.max(0, mProfit));
+                        const mTax = mTaxCalc.totalTax;
                         const mNet = mProfit - mTax;
                         return (
                           <tr key={month}>
