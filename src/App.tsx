@@ -190,7 +190,7 @@ const CTC_PER_CHILD = 2000; // Child Tax Credit per qualifying child
 const STANDARD_DEDUCTION_MFJ = 31400; // 2026 estimated MFJ
 const QBI_RATE = 0.20; // Qualified Business Income deduction (20%)
 const SE_TAX_RATE = 0.153; // 15.3% (SS 12.4% + Medicare 2.9%)
-const _DEBT_SAVINGS_RATE = 0.04; // 4% of revenue toward debt (used in debt drain meter)
+// const DEBT_SAVINGS_RATE = 0.04; // 4% of revenue toward debt — will wire into debt drain meter
 
 // 2026 Federal Tax Brackets (MFJ)
 const FED_BRACKETS: [number, number][] = [
