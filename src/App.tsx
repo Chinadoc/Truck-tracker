@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   Truck,
@@ -46,12 +46,143 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
+// === US CITIES DATABASE (major trucking hubs) ===
+const US_CITIES: string[] = [
+  'Atlanta, GA 30301', 'Austin, TX 78701', 'Baltimore, MD 21201', 'Birmingham, AL 35201',
+  'Boise, ID 83701', 'Boston, MA 02101', 'Buffalo, NY 14201', 'Charlotte, NC 28201',
+  'Chicago, IL 60601', 'Cincinnati, OH 45201', 'Cleveland, OH 44101', 'Colorado Springs, CO 80901',
+  'Columbus, OH 43201', 'Dallas, TX 75201', 'Dayton, OH 45401', 'Denver, CO 80201',
+  'Des Moines, IA 50301', 'Detroit, MI 48201', 'Easton, PA 18040', 'El Paso, TX 79901',
+  'Fort Worth, TX 76101', 'Fresno, CA 93701', 'Grand Prairie, TX 75050', 'Green Bay, WI 54301',
+  'Greensboro, NC 27401', 'Harrisburg, PA 17101', 'Hartford, CT 06101', 'Houston, TX 77001',
+  'Indianapolis, IN 46201', 'Jacksonville, FL 32099', 'Kansas City, MO 64101', 'Knoxville, TN 37901',
+  'La Mirada, CA 90637', 'Laredo, TX 78040', 'Las Vegas, NV 89101', 'Little Rock, AR 72201',
+  'Long Beach, CA 90801', 'Los Angeles, CA 90001', 'Louisville, KY 40201', 'Lubbock, TX 79401',
+  'Memphis, TN 38101', 'Miami, FL 33101', 'Milwaukee, WI 53201', 'Minneapolis, MN 55401',
+  'Mobile, AL 36601', 'Nashville, TN 37201', 'New Orleans, LA 70112', 'New York, NY 10001',
+  'Newark, NJ 07101', 'Norfolk, VA 23501', 'Oakland, CA 94601', 'Oklahoma City, OK 73101',
+  'Omaha, NE 68101', 'Orlando, FL 32801', 'Philadelphia, PA 19101', 'Phoenix, AZ 85001',
+  'Pittsburgh, PA 15201', 'Portland, OR 97201', 'Raleigh, NC 27601', 'Reno, NV 89501',
+  'Richmond, VA 23218', 'Riverside, CA 92501', 'Rosenberg, TX 77471', 'Sacramento, CA 95814',
+  'Salt Lake City, UT 84101', 'San Antonio, TX 78201', 'San Bernardino, CA 92401',
+  'San Diego, CA 92101', 'San Francisco, CA 94101', 'San Jose, CA 95101', 'Savannah, GA 31401',
+  'Seattle, WA 98101', 'Shreveport, LA 71101', 'Spokane, WA 99201', 'Springfield, MO 65801',
+  'St. Louis, MO 63101', 'Stockton, CA 95201', 'Tampa, FL 33601', 'Temple, TX 76501',
+  'Tucson, AZ 85701', 'Tulsa, OK 74101', 'Walnut, CA 91789', 'Washington, DC 20001',
+  'Wichita, KS 67201', 'Albuquerque, NM 87101', 'Ashland, OH 44805', 'Bakersfield, CA 93301',
+  'Baton Rouge, LA 70801', 'Billings, MT 59101', 'Chattanooga, TN 37401', 'Columbia, SC 29201',
+  'Corpus Christi, TX 78401', 'Fargo, ND 58102', 'Fort Wayne, IN 46801', 'Grand Rapids, MI 49501',
+  'Huntsville, AL 35801', 'Jackson, MS 39201', 'Lincoln, NE 68501', 'Lexington, KY 40501',
+  'Marengo, OH 43334', 'McAllen, TX 78501', 'Montgomery, AL 36101', 'Ogden, UT 84401',
+  'Pensacola, FL 32501', 'Provo, UT 84601', 'Rapid City, SD 57701', 'Sioux Falls, SD 57101',
+  'Syracuse, NY 13201', 'Topeka, KS 66601', 'Trenton, NJ 08601', 'Waco, TX 76701',
+];
+
+// Fuzzy city matcher — tolerates typos
+const fuzzyMatch = (query: string, city: string): boolean => {
+  const q = query.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  const c = city.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  if (c.includes(q)) return true;
+  // Token-based: each word in query should appear somewhere in city
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.every(t => c.includes(t))) return true;
+  // Levenshtein-lite: check if first token is within edit distance 2 of city name start
+  const cityName = c.split(',')[0].trim();
+  const firstToken = tokens[0] || '';
+  if (firstToken.length >= 3) {
+    let dist = 0;
+    const shorter = Math.min(firstToken.length, cityName.length);
+    for (let i = 0; i < shorter; i++) {
+      if (firstToken[i] !== cityName[i]) dist++;
+    }
+    dist += Math.abs(firstToken.length - cityName.length);
+    if (dist <= 2) return true;
+  }
+  return false;
+};
+
+// City Autocomplete Component
+const CityAutocomplete = ({ name, defaultValue, placeholder, onChange, style }: {
+  name?: string; defaultValue?: string; placeholder?: string;
+  onChange?: (val: string) => void; style?: React.CSSProperties;
+}) => {
+  const [value, setValue] = useState(defaultValue ?? '');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = useMemo(() => {
+    if (!value || value.length < 2) return [];
+    return US_CITIES.filter(c => fuzzyMatch(value, c)).slice(0, 6);
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowSuggestions(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectCity = (city: string) => {
+    setValue(city);
+    setShowSuggestions(false);
+    onChange?.(city);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx(i => Math.min(i + 1, suggestions.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectCity(suggestions[highlightIdx]); }
+    else if (e.key === 'Escape') setShowSuggestions(false);
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <input
+        type="text" name={name} value={value} placeholder={placeholder} style={style}
+        onChange={e => { setValue(e.target.value); setShowSuggestions(true); setHighlightIdx(-1); onChange?.(e.target.value); }}
+        onFocus={() => value.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+        onKeyDown={handleKeyDown}
+        autoComplete="off"
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
+          background: '#1a1f2e', border: '1px solid var(--border)', borderRadius: '8px',
+          marginTop: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', overflow: 'hidden',
+          maxHeight: '200px', overflowY: 'auto',
+        }}>
+          {suggestions.map((city, i) => (
+            <div
+              key={city}
+              onClick={() => selectCity(city)}
+              style={{
+                padding: '0.5rem 0.75rem', cursor: 'pointer', fontSize: '0.85rem',
+                background: i === highlightIdx ? 'rgba(59,130,246,0.2)' : 'transparent',
+                color: i === highlightIdx ? 'var(--accent)' : 'var(--text-primary)',
+                borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              }}
+              onMouseEnter={() => setHighlightIdx(i)}
+            >
+              <MapPin size={12} style={{ display: 'inline', marginRight: '0.5rem', opacity: 0.5 }} />{city}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // === CONSTANTS ===
 const COMPANY_DRIVER_RATE = 0.65;
 const VEHICLE_VALUE = 85000;
 const THREE_YEAR_MILES = 360000;
 const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
-const CASCADIA_MAINT_RESERVE = 0.15;
+const TIRE_SET_COST = 4000;       // 18 tires, full set
+const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
+const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
 const TOTAL_TAX_RATE = 0.273;
 
@@ -437,10 +568,24 @@ function App() {
     const fd = new FormData(e.currentTarget);
     const distance = Number(fd.get('distance'));
     const totalPayout = Number(fd.get('totalPayout'));
+    const originCity = (fd.get('originCity') as string) || '';
+    const destCity = (fd.get('destCity') as string) || '';
+    const fuelCost = Number(fd.get('fuelCost') || 0);
+    const tripDate = fd.get('date') as string;
+    const tripId = uuidv4();
     setIncomes([...incomes, {
-      id: uuidv4(), date: fd.get('date') as string, loadId: fd.get('loadId') as string,
-      broker: fd.get('broker') as string, distance, ratePerMile: distance > 0 ? totalPayout / distance : 0, totalPayout,
+      id: tripId, date: tripDate, loadId: (fd.get('loadId') as string) || '',
+      broker: (fd.get('broker') as string) || '', distance, ratePerMile: distance > 0 ? totalPayout / distance : 0, totalPayout,
+      originCity: originCity || undefined, destCity: destCity || undefined,
     }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    // Auto-create fuel expense if fuel cost entered
+    if (fuelCost > 0) {
+      const desc = originCity && destCity ? `Fuel: ${originCity} → ${destCity}` : 'Fuel (manual entry)';
+      setExpenses(prev => [...prev, {
+        id: `fuel-${tripId}`, date: tripDate, category: 'Fuel' as const,
+        description: desc, amount: fuelCost,
+      }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    }
     setIsIncomeModalOpen(false);
   };
 
@@ -1107,8 +1252,8 @@ function App() {
                               <td>
                                 {isEditing ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <input defaultValue={inc.originCity ?? ''} placeholder="Origin" style={inputStyle} onChange={e => handleEditTrip(inc.id, 'originCity', e.target.value)} />
-                                    <input defaultValue={inc.destCity ?? ''} placeholder="Destination" style={inputStyle} onChange={e => handleEditTrip(inc.id, 'destCity', e.target.value)} />
+                                    <CityAutocomplete defaultValue={inc.originCity ?? ''} placeholder="Origin" style={inputStyle} onChange={val => handleEditTrip(inc.id, 'originCity', val)} />
+                                    <CityAutocomplete defaultValue={inc.destCity ?? ''} placeholder="Destination" style={inputStyle} onChange={val => handleEditTrip(inc.id, 'destCity', val)} />
                                   </div>
                                 ) : (
                                   <>
@@ -1122,7 +1267,15 @@ function App() {
                               <td>{isEditing ? <input type="number" defaultValue={inc.distance} style={{ ...inputStyle, width: '70px' }} onChange={e => handleEditTrip(inc.id, 'distance', Number(e.target.value))} /> : inc.distance.toLocaleString()}</td>
                               <td>{formatCurrency(inc.ratePerMile)}</td>
                               <td>{isEditing ? <input type="number" step="0.01" defaultValue={inc.totalPayout} style={{ ...inputStyle, width: '80px' }} onChange={e => handleEditTrip(inc.id, 'totalPayout', Number(e.target.value))} /> : <span className="text-success font-semibold">{formatCurrency(inc.totalPayout)}</span>}</td>
-                              <td className="text-danger">{formatCurrency(tripFuel)}</td>
+                              <td className="text-danger">{isEditing ? <input type="number" step="0.01" defaultValue={Math.round(tripFuel * 100) / 100} style={{ ...inputStyle, width: '80px' }} onChange={e => {
+                                const newFuel = Number(e.target.value);
+                                const fuelExpId = `fuel-${inc.id}`;
+                                setExpenses(prev => {
+                                  const existing = prev.find(ex => ex.id === fuelExpId);
+                                  if (existing) return prev.map(ex => ex.id === fuelExpId ? { ...ex, amount: newFuel } : ex);
+                                  return [...prev, { id: fuelExpId, date: inc.date, category: 'Fuel' as const, description: `Fuel: ${inc.originCity ?? ''} → ${inc.destCity ?? ''}`, amount: newFuel }];
+                                });
+                              }} /> : formatCurrency(tripFuel)}</td>
                               <td style={{ color: tripTrueNet >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(tripTrueNet)}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1942,14 +2095,22 @@ function App() {
           <div className="modal animate-scale-in">
             <div className="modal-header"><h2 className="modal-title">Record New Load</h2><button className="btn-icon" onClick={() => setIsIncomeModalOpen(false)}><X size={20} /></button></div>
             <form onSubmit={handleAddIncome}>
+              <div className="form-group"><label>Date</label><input type="date" name="date" required defaultValue={new Date().toISOString().split('T')[0]} /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="form-group"><label>Date</label><input type="date" name="date" required defaultValue={new Date().toISOString().split('T')[0]} /></div>
-                <div className="form-group"><label>Load ID / BOL #</label><input type="text" name="loadId" required placeholder="e.g. LD-1024" /></div>
+                <div className="form-group"><label>Origin (City, State ZIP)</label><CityAutocomplete name="originCity" placeholder="e.g. Houston, TX 77038" /></div>
+                <div className="form-group"><label>Destination (City, State ZIP)</label><CityAutocomplete name="destCity" placeholder="e.g. Easton, PA 18040" /></div>
               </div>
-              <div className="form-group"><label>Broker / Customer</label><input type="text" name="broker" required placeholder="e.g. TQL, CH Robinson" /></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="form-group"><label>Distance (Miles)</label><input type="number" name="distance" min="1" required placeholder="850" /></div>
                 <div className="form-group"><label>Total Payout ($)</label><input type="number" step="0.01" min="0" name="totalPayout" required placeholder="2500.00" /></div>
+                <div className="form-group"><label>Fuel Cost ($)</label><input type="number" step="0.01" min="0" name="fuelCost" placeholder="0.00" /></div>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
+                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Optional</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="form-group"><label style={{ opacity: 0.6 }}>Load ID / BOL #</label><input type="text" name="loadId" placeholder="e.g. LD-1024" /></div>
+                  <div className="form-group"><label style={{ opacity: 0.6 }}>Broker / Customer</label><input type="text" name="broker" placeholder="e.g. TQL" /></div>
+                </div>
               </div>
               <div className="form-actions"><button type="button" className="btn-icon" onClick={() => setIsIncomeModalOpen(false)}>Cancel</button><button type="submit" className="btn-primary">Save Load</button></div>
             </form>
