@@ -1075,11 +1075,11 @@ function App() {
                         <div key={i} style={{ width: `${pct}%`, background: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>{pct > 8 ? `${pct.toFixed(0)}%` : ''}</div>
                       ) : null;
                     })}
-                    {afterTax < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
+                    {afterPersonal < 0 && <div style={{ flex: 1, background: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)' }}>DEFICIT</div>}
                   </div>
 
                   {/* Bucket columns — 4 */}
-                  <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                  <div className="grid-5-buckets" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.6rem' }}>
                     {buckets.map((b, i) => {
                       const fillPct = b.amount > 0 ? Math.min(100, (b.filled / b.amount) * 100) : 0;
                       const isFunded = b.filled >= b.amount && b.amount > 0;
@@ -1094,7 +1094,7 @@ function App() {
                           </div>
                           <div style={{ marginTop: '0.4rem', fontSize: '0.7rem', fontWeight: 700 }}>{b.label}</div>
                           <div style={{ fontSize: '0.5rem', color: b.color, marginTop: '0.15rem' }}>
-                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : i === 3 ? (afterTax >= 0 ? '✓ Take home' : formatCurrency(afterTax)) : '✗ Empty'}
+                            {isFunded ? '✓ Funded' : isPartial ? `⚠ ${formatCurrency(b.amount - b.filled)} short` : i === 4 ? (afterPersonal >= 0 ? '✓ Take home' : formatCurrency(afterPersonal)) : '✗ Empty'}
                           </div>
                         </div>
                       );
@@ -1751,7 +1751,7 @@ function App() {
               {/* Tax Reminder */}
               <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid var(--danger)' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--danger)' }}>1099-NEC Quarterly Estimated Tax</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', fontSize: '0.8rem' }}>
+                <div className="grid-quarterly" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', fontSize: '0.8rem' }}>
                   {[{ q: 'Q1 (Jan-Mar)', due: 'Apr 15' }, { q: 'Q2 (Apr-Jun)', due: 'Jun 15' }, { q: 'Q3 (Jul-Sep)', due: 'Sep 15' }, { q: 'Q4 (Oct-Dec)', due: 'Jan 15' }].map(q => (
                     <div key={q.q} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '8px', textAlign: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.75rem' }}>{q.q}</div>
@@ -1761,6 +1761,98 @@ function App() {
                   ))}
                 </div>
               </div>
+
+              {/* === YEAR VIEW === */}
+              {(() => {
+                const currentYear = new Date().getFullYear();
+                const currentMonth = new Date().getMonth(); // 0-indexed
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                // Calculate per-month averages from actual data
+                const actualMonths = [...new Set(incomes.map(i => i.date.substring(0, 7)))];
+                const avgMonthlyRevenue = actualMonths.length > 0 ? totalIncome / actualMonths.length : 0;
+                const avgMonthlyExpenses = actualMonths.length > 0 ? (totalExpenses + analysis.totalHiddenCosts) / actualMonths.length : 0;
+                const monthlyPersonal = totalPersonalMonthly;
+
+                const yearData = monthNames.map((name, idx) => {
+                  const monthKey = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
+                  const mInc = incomes.filter(i => i.date.startsWith(monthKey));
+                  const mExp = expenses.filter(e => e.date.startsWith(monthKey));
+                  const isActual = idx <= currentMonth && mInc.length > 0;
+                  const revenue = isActual ? mInc.reduce((s, i) => s + i.totalPayout, 0) : (idx > currentMonth ? avgMonthlyRevenue : 0);
+                  const mMiles = isActual ? mInc.reduce((s, i) => s + i.distance, 0) : 0;
+                  const bizCosts = isActual
+                    ? mExp.reduce((s, e) => s + e.amount, 0) + mMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE)
+                    : (idx > currentMonth ? avgMonthlyExpenses : 0);
+                  const profit = revenue - bizCosts;
+                  const tax = calculateTax(Math.max(0, profit)).totalTax;
+                  const net = profit - tax - monthlyPersonal;
+                  return { name, revenue, bizCosts, tax, personal: monthlyPersonal, net, isActual, isCurrent: idx === currentMonth };
+                });
+
+                const annualRevenue = yearData.reduce((s, m) => s + m.revenue, 0);
+                const annualCosts = yearData.reduce((s, m) => s + m.bizCosts, 0);
+                const annualTax = yearData.reduce((s, m) => s + m.tax, 0);
+                const annualPersonal = monthlyPersonal * 12;
+                const annualNet = annualRevenue - annualCosts - annualTax - annualPersonal;
+                const maxRevenue = Math.max(...yearData.map(m => m.revenue), 1);
+
+                return (
+                  <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #3b82f6' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CalendarDays size={18} style={{ color: '#3b82f6' }} /> {currentYear} Year View
+                    </h3>
+                    <p className="text-secondary" style={{ fontSize: '0.7rem', marginBottom: '1rem' }}>Solid = actual · Striped = projected from averages</p>
+
+                    {/* 12-month bar chart */}
+                    <div className="year-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '4px', marginBottom: '1rem' }}>
+                      {yearData.map((m, i) => {
+                        const barH = maxRevenue > 0 ? (m.revenue / maxRevenue) * 80 : 0;
+                        return (
+                          <div key={i} style={{ textAlign: 'center' }}>
+                            <div style={{ height: '90px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <div style={{
+                                width: '100%', height: `${barH}px`, borderRadius: '4px 4px 0 0',
+                                background: m.net >= 0 ? (m.isActual ? '#10b981' : 'repeating-linear-gradient(45deg, #10b981, #10b981 3px, #10b98166 3px, #10b98166 6px)') : (m.isActual ? '#ef4444' : 'repeating-linear-gradient(45deg, #ef4444, #ef4444 3px, #ef444466 3px, #ef444466 6px)'),
+                                border: m.isCurrent ? '2px solid #3b82f6' : 'none',
+                                transition: 'height 0.5s ease-out',
+                                position: 'relative',
+                              }}>
+                                {barH > 20 && <div style={{ position: 'absolute', top: '2px', left: 0, right: 0, fontSize: '0.45rem', fontWeight: 700, color: '#fff', textAlign: 'center' }}>{formatCurrency(m.revenue).replace('$', '')}</div>}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '0.55rem', fontWeight: m.isCurrent ? 800 : 600, color: m.isCurrent ? '#3b82f6' : 'var(--text-secondary)', marginTop: '0.2rem' }}>{m.name}</div>
+                            <div style={{ fontSize: '0.45rem', fontWeight: 700, color: m.net >= 0 ? 'var(--success)' : 'var(--danger)' }}>{m.revenue > 0 ? formatCurrency(m.net) : '—'}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Annual totals */}
+                    <div className="year-totals" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', fontSize: '0.7rem' }}>
+                      <div style={{ background: 'rgba(16,185,129,0.1)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>Revenue</div>
+                        <div style={{ fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(annualRevenue)}</div>
+                      </div>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase' }}>Biz Costs</div>
+                        <div style={{ fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(annualCosts)}</div>
+                      </div>
+                      <div style={{ background: 'rgba(168,85,247,0.1)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(168,85,247,0.2)' }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#a855f7', textTransform: 'uppercase' }}>Taxes</div>
+                        <div style={{ fontWeight: 800, color: '#a855f7' }}>{formatCurrency(annualTax)}</div>
+                      </div>
+                      <div style={{ background: 'rgba(234,179,8,0.1)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(234,179,8,0.2)' }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#eab308', textTransform: 'uppercase' }}>Personal</div>
+                        <div style={{ fontWeight: 800, color: '#eab308' }}>{formatCurrency(annualPersonal)}</div>
+                      </div>
+                      <div style={{ background: annualNet >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: `1px solid ${annualNet >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 700, color: annualNet >= 0 ? 'var(--success)' : 'var(--danger)', textTransform: 'uppercase' }}>Net</div>
+                        <div style={{ fontWeight: 800, color: annualNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(annualNet)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Cost Reduction Strategies */}
               <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #3b82f6' }}>
