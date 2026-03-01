@@ -526,6 +526,35 @@ function App() {
   useEffect(() => { localStorage.setItem('rl_expenses', JSON.stringify(expenses)); }, [expenses]);
   useEffect(() => { localStorage.setItem('rl_personal', JSON.stringify(personalExpenses)); }, [personalExpenses]);
 
+  // === CLOUD SYNC (Cloudflare D1) ===
+  const SYNC_API = 'https://truck-tracker-api.jeremy-samuels17.workers.dev';
+  const SYNC_KEY = 'truck-sync-2026-jeremy';
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasPulledRef = useRef(false);
+
+  // Pull from cloud on first load
+  useEffect(() => {
+    if (hasPulledRef.current) return;
+    hasPulledRef.current = true;
+    setSyncStatus('syncing');
+    fetch(`${SYNC_API}/sync`, { headers: { 'X-API-Key': SYNC_KEY } })
+      .then(r => r.json())
+      .then((data: { incomes?: Income[]; expenses?: Expense[]; personalExpenses?: PersonalExpense[]; debts?: Debt[]; updatedAt?: string }) => {
+        if (data.updatedAt) {
+          // Cloud has data — use it as source of truth
+          if (data.incomes && data.incomes.length > 0) setIncomes(data.incomes);
+          if (data.expenses && data.expenses.length > 0) setExpenses(data.expenses);
+          if (data.personalExpenses && data.personalExpenses.length > 0) setPersonalExpenses(data.personalExpenses);
+          if (data.debts && data.debts.length > 0) setDebts(data.debts);
+        }
+        setSyncStatus('synced');
+      })
+      .catch(() => setSyncStatus('error'));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+
   // Personal expense totals
   const totalPersonalMonthly = useMemo(() => personalExpenses.reduce((s, p) => s + p.monthlyAmount, 0), [personalExpenses]);
 
@@ -557,6 +586,23 @@ function App() {
   const [debts, setDebts] = useState<Debt[]>(() => loadState('rl_debts', INITIAL_DEBTS));
   useEffect(() => { localStorage.setItem('rl_debts', JSON.stringify(debts)); }, [debts]);
   const totalDebt = useMemo(() => debts.reduce((s, d) => s + d.amount, 0), [debts]);
+
+  // Push to cloud on data changes (debounced 2s)
+  useEffect(() => {
+    if (!hasPulledRef.current) return; // don't push before initial pull
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      setSyncStatus('syncing');
+      fetch(`${SYNC_API}/sync`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': SYNC_KEY },
+        body: JSON.stringify({ incomes, expenses, personalExpenses, debts }),
+      })
+        .then(r => r.ok ? setSyncStatus('synced') : setSyncStatus('error'))
+        .catch(() => setSyncStatus('error'));
+    }, 2000);
+    return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
+  }, [incomes, expenses, personalExpenses, debts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const analysis = useMemo(() => {
     const expectedFuelCost = totalMiles * (REGIONAL_DIESEL['AVG'].price / MPG);
@@ -732,6 +778,9 @@ function App() {
       {/* Sidebar */}
       <aside className="sidebar glass-panel" style={{ borderRadius: 0, borderTop: 0, borderBottom: 0, borderLeft: 0 }}>
         <div className="brand"><Truck size={28} className="text-accent" /><span>Road Ledger</span></div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', marginTop: '0.25rem', color: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'syncing' ? '#eab308' : syncStatus === 'error' ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: 600 }}>
+          {syncStatus === 'synced' ? '🟢 Synced' : syncStatus === 'syncing' ? '🟡 Syncing...' : syncStatus === 'error' ? '🔴 Offline' : '⚪ Local'}
+        </div>
         <nav className="nav-links mt-8">
           {([
             { tab: 'dashboard' as const, icon: <LayoutDashboard size={20} />, label: 'Dashboard', ps: 'ډشبورډ' },

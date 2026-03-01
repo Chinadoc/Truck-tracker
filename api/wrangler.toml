@@ -1,0 +1,11 @@
+name = "truck-tracker-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "truck-tracker-db"
+database_id = "740f2e3b-6a7a-4384-87df-8e8d7c9fc338"
+
+[vars]
+API_KEY = "truck-sync-2026-jeremy"
