@@ -912,14 +912,18 @@ function App() {
             {/* ★ Monthly Break-Even — Miles-based */}
             {(() => {
               // Per-mile economics (month-scoped)
+              const numTrips = monthIncomes.length;
               const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
               const fuelPerMile = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
-              const dispatchPerMile = ratePerMile * 0.10; // Dispatch is 10% of revenue — variable cost
-              const variableCostPerMile = fuelPerMile + dispatchPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+              const dispatchPerMile = ratePerMile * 0.10; // Dispatch is 10% of revenue
+              const deadheadCost = numTrips * 40 * fuelPerMile; // 40 mi deadhead per job at fuel rate
+              const deadheadPerMile = monthMiles > 0 ? deadheadCost / monthMiles : 0;
+              const tollsPerMile = ratePerMile * 0.005; // 0.5% of revenue
+              const variableCostPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
               const marginalProfitPerMile = ratePerMile - variableCostPerMile;
 
-              // Fixed costs this month (use known monthly amounts if no expense records for this month)
-              const fixedCosts = monthExpenses.filter(e => ['Insurance', 'Registration', 'Lock Box', 'Trailer'].includes(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
+              // Fixed costs this month (always use known monthly amounts)
+              const fixedCosts = MONTHLY_FIXED_COSTS;
 
               // Revenue after variable costs covers fixed costs first, then personal/debt
               const grossMargin = monthIncome - (monthMiles * variableCostPerMile);
@@ -941,7 +945,7 @@ function App() {
 
                   {/* Per-mile economics strip */}
                   {(() => {
-                    const fixedPerMile = totalMiles > 0 ? fixedCosts / totalMiles : 0;
+                    const fixedPerMile = monthMiles > 0 ? fixedCosts / monthMiles : 0;
                     const allInCostPerMile = variableCostPerMile + fixedPerMile;
                     const trueNetPerMile = ratePerMile - allInCostPerMile;
                     return (
@@ -954,7 +958,7 @@ function App() {
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Variable</div>
                             <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${variableCostPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>fuel+disp+depr+maint</div>
+                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>fuel+dh+disp+tolls+depr+maint</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center', border: '1px solid rgba(234,179,8,0.25)' }}>
                             <div style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Fixed/Mi ↓</div>
@@ -1032,12 +1036,15 @@ function App() {
               </div>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}><TrendingDown size={14} /> Total True Costs</div>
-                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(monthTotalExpenses + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE))}</div>
-                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fuel + Deadhead + Reserves</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(monthTotalExpenses + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE) + monthIncomes.length * 40 * (monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0) + monthIncome * 0.005)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fuel + DH + Tolls + Reserves</div>
               </div>
               {(() => {
+                const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
                 const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden;
+                const mDHest = monthIncomes.length * 40 * fpm;
+                const mTollEst = monthIncome * 0.005;
+                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
@@ -1058,13 +1065,21 @@ function App() {
                   <Calculator size={18} className="text-accent" /> {bi('Where Every Dollar Goes (Per Mile)')}
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  {[
+                  {(() => {
+                    const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
+                    const dhPerMile = monthMiles > 0 ? (monthIncomes.length * 40 * fpm) / monthMiles : 0;
+                    const tollsPerMile = (monthIncome / Math.max(1, monthMiles)) * 0.005;
+                    const dispatchPerMile = (monthIncome / Math.max(1, monthMiles)) * 0.10;
+                    const allVarPerMile = fpm + dhPerMile + tollsPerMile + dispatchPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                    const trueNetPerMile = (monthIncome / Math.max(1, monthMiles)) - allVarPerMile;
+                    return [
                     { label: 'Avg Rate', value: `$${(monthIncome / Math.max(1, monthMiles)).toFixed(2)}`, color: 'var(--success)', sub: 'per loaded mi' },
-                    { label: 'Fuel', value: `-$${(monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / Math.max(1, monthMiles)).toFixed(2)}`, color: 'var(--danger)', sub: 'regional diesel' },
-                    { label: 'Depreciation', value: `-$${CASCADIA_DEPR_RATE.toFixed(3)}`, color: 'var(--danger)', sub: '$85k / 3yr' },
-                    { label: 'Maint Reserve', value: `-$${CASCADIA_MAINT_RESERVE.toFixed(2)}`, color: '#eab308', sub: 'tires/repairs' },
-                    { label: 'TRUE Net/mi', value: `$${((monthIncome - monthTotalExpenses - monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE)) / Math.max(1, monthMiles)).toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
-                  ].map((item, i) => (
+                    { label: 'Fuel+DH', value: `-$${(fpm + dhPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `fuel + 40mi/trip dh` },
+                    { label: 'Disp+Tolls', value: `-$${(dispatchPerMile + tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: '10% + 0.5% of rev' },
+                    { label: 'Depr+Maint', value: `-$${(CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE).toFixed(3)}`, color: '#eab308', sub: 'reserves/mi' },
+                    { label: 'TRUE Net/mi', value: `$${trueNetPerMile.toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
+                    ];
+                  })().map((item, i) => (
                     <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{item.label}</div>
                       <div style={{ fontSize: '1.15rem', fontWeight: 800, color: item.color }}>{item.value}</div>
@@ -1078,15 +1093,19 @@ function App() {
                 </h4>
                 {(() => {
                   const mFuelCost = monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0);
+                  const fpm = monthMiles > 0 ? mFuelCost / monthMiles : 0;
                   const mDeprReserve = monthMiles * CASCADIA_DEPR_RATE;
                   const mMaintReserve = monthMiles * CASCADIA_MAINT_RESERVE;
+                  const mDHest = monthIncomes.length * 40 * fpm;
+                  const mTollEst = monthIncome * 0.005;
                   const mHiddenCosts = mDeprReserve + mMaintReserve;
-                  const mTotalCosts = monthTotalExpenses + mHiddenCosts;
+                  const mTotalCosts = monthTotalExpenses + mHiddenCosts + mDHest + mTollEst;
                   return (
                     <>
                       {[
-                        { name: 'Diesel & DEF (Regional Est.)', amount: mFuelCost, color: 'var(--danger)' },
-                        { name: 'Deadhead (Empty Miles)', amount: monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), color: '#f97316' },
+                        { name: 'Diesel & DEF', amount: mFuelCost, color: 'var(--danger)' },
+                        { name: 'Deadhead Est (40mi/trip)', amount: mDHest, color: '#f97316' },
+                        { name: 'Tolls Est (0.5% rev)', amount: mTollEst, color: '#f97316' },
                         { name: 'Truck Depreciation Reserve', amount: mDeprReserve, color: 'var(--danger)' },
                         { name: 'Maintenance & Tires Reserve', amount: mMaintReserve, color: '#eab308' },
                       ].map((b, i) => {
@@ -1114,8 +1133,11 @@ function App() {
               </div>
 
               {(() => {
+                const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
                 const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden;
+                const mDHest = monthIncomes.length * 40 * fpm;
+                const mTollEst = monthIncome * 0.005;
+                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
@@ -1154,11 +1176,16 @@ function App() {
             {(() => {
               // Split business expenses into Fixed and Variable
               const fixedCategories = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer']);
-              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch', 'Food', 'Tolls']);
-              const fixedExpenses = monthExpenses.filter(e => fixedCategories.has(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
+              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch']);
+              const fixedExpenses = MONTHLY_FIXED_COSTS;
+              const numTrips = monthIncomes.length;
+              const fuelPerMile = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
+              const deadheadEst = numTrips * 40 * fuelPerMile;
+              const tollsEst = monthIncome * 0.005;
               const variableExpenses = monthExpenses.filter(e => variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0)
-                + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE); // depreciation + maintenance are variable (per-mile)
-              const otherBizExpenses = monthExpenses.filter(e => !fixedCategories.has(e.category) && !variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0);
+                + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE)
+                + deadheadEst + tollsEst; // add deadhead + tolls estimates
+              const otherBizExpenses = monthExpenses.filter(e => !fixedCategories.has(e.category) && !variableCategories.has(e.category) && e.category !== 'Food' && e.category !== 'Tolls').reduce((s, e) => s + e.amount, 0);
               const mTrueNet = monthIncome - monthTotalExpenses - monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
               const taxCosts = calculateTax(Math.max(0, mTrueNet)).totalTax;
               const personalCosts = totalPersonalMonthly;
@@ -1170,7 +1197,7 @@ function App() {
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
                 { label: <>🏢 {bi('Fixed Costs')}</>, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
-                { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Tolls · Depreciation · Maint · Food', delay: '0.3s' },
+                { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch · Deadhead · Tolls · Depr · Maint', delay: '0.3s' },
                 { label: <>🏛 {bi('Taxes')}</>, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
                 { label: <>🏠 {bi('Personal + Debt')}</>, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
                 { label: <>💰 {bi('Surplus')}</>, amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
@@ -1306,14 +1333,14 @@ function App() {
               const tiles = [
                 { label: '🛡 Insurance', mVal: mExp('Insurance') || 2400, yVal: yExp('Insurance') || 2400, type: 'fixed' },
                 { label: '🚛 Trailer', mVal: mExp('Trailer') || 600, yVal: yExp('Trailer') || 600, type: 'fixed' },
-                { label: '🛣 Tolls', mVal: mExp('Tolls'), yVal: yExp('Tolls'), type: 'variable' },
                 { label: '🔒 Lock Box', mVal: mExp('Lock Box') || 100, yVal: yExp('Lock Box') || 100, type: 'fixed' },
                 { label: '📋 Registration', mVal: mExp('Registration') || 133, yVal: yExp('Registration') || 133, type: 'fixed' },
                 { label: '⛽ Fuel', mVal: mExp('Fuel'), yVal: yExp('Fuel'), type: 'variable' },
                 { label: '📞 Dispatch 10%', mVal: monthIncome * 0.10, yVal: totalIncome * 0.10, type: 'variable' },
+                { label: '🚚 Deadhead Est', mVal: monthIncomes.length * 40 * (monthMiles > 0 ? mExp('Fuel') / monthMiles : 0), yVal: completedIncomes.length * 40 * (totalMiles > 0 ? yExp('Fuel') / totalMiles : 0), type: 'variable' },
+                { label: '🛣 Tolls Est (0.5%)', mVal: monthIncome * 0.005, yVal: totalIncome * 0.005, type: 'variable' },
                 { label: '📉 Depreciation', mVal: mDepr, yVal: yDepr, type: 'variable' },
                 { label: '🔧 Maintenance', mVal: mMaint, yVal: yMaint, type: 'variable' },
-                { label: '🍔 Road Food', mVal: mExp('Food'), yVal: yExp('Food'), type: 'variable' },
               ].filter(t => t.mVal > 0 || t.yVal > 0);
               return (
               <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
