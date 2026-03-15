@@ -1296,25 +1296,39 @@ function App() {
             })()}
 
             {/* Compact Expense Breakdown on Dashboard */}
-            <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
-              {[
-                { label: '🛡 Insurance', val: '$2,400/mo', type: 'fixed' },
-                { label: '🚛 Trailer', val: '$600/mo', type: 'fixed' },
-                { label: '🛣 Tolls', val: '$250/mo', type: 'variable' },
-                { label: '🔒 Lock Box', val: '$100/mo', type: 'fixed' },
-                { label: '📋 Registration', val: '$133/mo', type: 'fixed' },
-                { label: '⛽ Fuel', val: formatCurrency(analysis.trackedFuelCost), type: 'variable' },
-                { label: '📞 Dispatch 10%', val: formatCurrency(monthIncome * 0.10), type: 'variable' },
-                { label: '📉 Depreciation', val: formatCurrency(analysis.vehicleDepreciation), type: 'variable' },
-                { label: '🔧 Maintenance', val: formatCurrency(analysis.maintReserve), type: 'variable' },
-                { label: '🍔 Road Food', val: formatCurrency(expenses.filter(e => e.category === 'Food').reduce((s, e) => s + e.amount, 0)), type: 'variable' },
-              ].map((e, i) => (
-                <div key={i} style={{ background: 'rgba(0,0,0,0.2)', border: `1px solid ${e.type === 'fixed' ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.2)'}`, borderRadius: '8px', padding: '0.5rem 0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
-                  <span>{e.label}</span>
-                  <span style={{ fontWeight: 700, color: e.type === 'fixed' ? 'var(--danger)' : '#f97316', fontSize: '0.75rem' }}>{e.val}</span>
-                </div>
-              ))}
-            </div>
+            {(() => {
+              const mExp = (cat: string) => monthExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+              const yExp = (cat: string) => completedExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+              const mDepr = monthMiles * CASCADIA_DEPR_RATE;
+              const mMaint = monthMiles * CASCADIA_MAINT_RESERVE;
+              const yDepr = totalMiles * CASCADIA_DEPR_RATE;
+              const yMaint = totalMiles * CASCADIA_MAINT_RESERVE;
+              const tiles = [
+                { label: '🛡 Insurance', mVal: mExp('Insurance') || 2400, yVal: yExp('Insurance') || 2400, type: 'fixed' },
+                { label: '🚛 Trailer', mVal: mExp('Trailer') || 600, yVal: yExp('Trailer') || 600, type: 'fixed' },
+                { label: '🛣 Tolls', mVal: mExp('Tolls'), yVal: yExp('Tolls'), type: 'variable' },
+                { label: '🔒 Lock Box', mVal: mExp('Lock Box') || 100, yVal: yExp('Lock Box') || 100, type: 'fixed' },
+                { label: '📋 Registration', mVal: mExp('Registration') || 133, yVal: yExp('Registration') || 133, type: 'fixed' },
+                { label: '⛽ Fuel', mVal: mExp('Fuel'), yVal: yExp('Fuel'), type: 'variable' },
+                { label: '📞 Dispatch 10%', mVal: monthIncome * 0.10, yVal: totalIncome * 0.10, type: 'variable' },
+                { label: '📉 Depreciation', mVal: mDepr, yVal: yDepr, type: 'variable' },
+                { label: '🔧 Maintenance', mVal: mMaint, yVal: yMaint, type: 'variable' },
+                { label: '🍔 Road Food', mVal: mExp('Food'), yVal: yExp('Food'), type: 'variable' },
+              ].filter(t => t.mVal > 0 || t.yVal > 0);
+              return (
+              <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                {tiles.map((e, i) => (
+                  <div key={i} style={{ background: 'rgba(0,0,0,0.2)', border: `1px solid ${e.type === 'fixed' ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.2)'}`, borderRadius: '8px', padding: '0.5rem 0.6rem', fontSize: '0.7rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{e.label}</span>
+                      <span style={{ fontWeight: 700, color: e.type === 'fixed' ? 'var(--danger)' : '#f97316', fontSize: '0.75rem' }}>{formatCurrency(e.mVal)}</span>
+                    </div>
+                    <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', marginTop: '0.15rem', textAlign: 'right' }}>YTD: {formatCurrency(e.yVal)}</div>
+                  </div>
+                ))}
+              </div>
+              );
+            })()}
 
             {/* Row 3: Tax & Seasonal */}
             <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
