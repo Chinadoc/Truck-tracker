@@ -184,6 +184,9 @@ const THREE_YEAR_MILES = 360000;
 const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
 const TIRE_SET_COST = 4000;       // 18 tires, full set
 const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
+
+// Known monthly fixed costs (used when no expense records exist for current month)
+const MONTHLY_FIXED_COSTS = 2400 + Math.round(1600 / 12) + 250 + 100 + 600; // Insurance + Registration + Tolls + Lock Box + Trailer = $3,484
 const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
 // === TAX CALCULATION (MFJ, 10 dependent children, self-employed 1099) ===
@@ -603,7 +606,6 @@ function App() {
   const totalExpenses = useMemo(() => completedExpenses.reduce((s, e) => s + e.amount, 0), [completedExpenses]);
   const totalMiles = useMemo(() => completedIncomes.reduce((s, i) => s + i.distance, 0), [completedIncomes]);
   const totalDeadhead = useMemo(() => completedIncomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [completedIncomes]);
-  const pendingRevenue = useMemo(() => pendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [pendingIncomes]);
 
   // === MONTH-SCOPED DATA (for dashboard) ===
   const monthIncomes = useMemo(() => completedIncomes.filter(i => i.date.startsWith(selectedMonth)), [completedIncomes, selectedMonth]);
@@ -911,8 +913,8 @@ function App() {
               const variableCostPerMile = fuelPerMile + dispatchPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
               const marginalProfitPerMile = ratePerMile - variableCostPerMile;
 
-              // Fixed costs this month (use known monthly amounts if no data yet)
-              const fixedCosts = monthExpenses.filter(e => ['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer'].includes(e.category)).reduce((s, e) => s + e.amount, 0) || (2400 + 134 + 250 + 100 + 600); // fallback to known monthly fixed costs
+              // Fixed costs this month (use known monthly amounts if no expense records for this month)
+              const fixedCosts = monthExpenses.filter(e => ['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer'].includes(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
 
               // Revenue after variable costs covers fixed costs first, then personal/debt
               const grossMargin = monthIncome - (monthMiles * variableCostPerMile);
@@ -1148,7 +1150,7 @@ function App() {
               // Split business expenses into Fixed and Variable
               const fixedCategories = new Set(['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer']);
               const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch', 'Food']);
-              const fixedExpenses = monthExpenses.filter(e => fixedCategories.has(e.category)).reduce((s, e) => s + e.amount, 0);
+              const fixedExpenses = monthExpenses.filter(e => fixedCategories.has(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
               const variableExpenses = monthExpenses.filter(e => variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0)
                 + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE); // depreciation + maintenance are variable (per-mile)
               const otherBizExpenses = monthExpenses.filter(e => !fixedCategories.has(e.category) && !variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0);
