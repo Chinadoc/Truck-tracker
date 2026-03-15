@@ -745,7 +745,11 @@ function App() {
     setIsExpenseModalOpen(false);
   };
 
-  const deleteIncome = (id: string) => setIncomes(incomes.filter(i => i.id !== id));
+  const deleteIncome = (id: string) => {
+    setIncomes(incomes.filter(i => i.id !== id));
+    // Cascade-delete auto-generated fuel & deadhead expenses linked to this trip
+    setExpenses(prev => prev.filter(e => e.id !== `fuel-${id}` && e.id !== `dh-${id}`));
+  };
   const deleteExpense = (id: string) => setExpenses(expenses.filter(e => e.id !== id));
   const formatCurrency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
