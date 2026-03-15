@@ -1169,11 +1169,11 @@ function App() {
               const afterPersonal = afterTax - personalCosts;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
-                { label: `🏢 ${bi('Fixed Costs')}`, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
-                { label: `📊 ${bi('Variable Costs')}`, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Tolls · Depreciation · Maint · Food', delay: '0.3s' },
-                { label: `🏛 ${bi('Taxes')}`, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
-                { label: `🏠 ${bi('Personal + Debt')}`, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
-                { label: `💰 ${bi('Surplus')}`, amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
+                { label: <>🏢 {bi('Fixed Costs')}</>, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
+                { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Tolls · Depreciation · Maint · Food', delay: '0.3s' },
+                { label: <>🏛 {bi('Taxes')}</>, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
+                { label: <>🏠 {bi('Personal + Debt')}</>, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
+                { label: <>💰 {bi('Surplus')}</>, amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
               ];
 
               // Reserve fund targets — how much you SHOULD be saving
