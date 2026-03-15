@@ -186,7 +186,7 @@ const TIRE_SET_COST = 4000;       // 18 tires, full set
 const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
 
 // Known monthly fixed costs (used when no expense records exist for current month)
-const MONTHLY_FIXED_COSTS = 2400 + Math.round(1600 / 12) + 250 + 100 + 600; // Insurance + Registration + Tolls + Lock Box + Trailer = $3,484
+const MONTHLY_FIXED_COSTS = 2400 + Math.round(1600 / 12) + 100 + 600; // Insurance + Registration + Lock Box + Trailer = $3,233
 const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
 // === TAX CALCULATION (MFJ, 10 dependent children, self-employed 1099) ===
@@ -254,11 +254,16 @@ const PS: Record<string, string> = {
   'Total': 'ټول', 'Profit': 'ګټه', 'Loss': 'زیان',
   'Owner-Operator Command Center': 'د مالک-چلونکي کمانډ مرکز',
   'Head-to-Head': 'مقایسه', 'Company Driver': 'د شرکت ډرایور',
-  'Tax': 'مالیه', 'Reserve': 'ذخیره', 'Surplus': 'اضافي',
+  'Tax': 'مالیه', 'Reserve': 'ذخیره',
   'Profit & Loss Reports': 'د ګټې او زیان راپورونه',
   'Debt Tracker': 'د قرض تعقیب', 'Monthly Obligations': 'میاشتنی مکلفیتونه',
   'Where Every Dollar Goes (Per Mile)': 'هر ډالر چیرته ځي (په مایل)',
   'Expense Buckets (Filling Up)': 'د لګښت بکسونه',
+  'Fixed Costs': 'ثابت لګښتونه',
+  'Variable Costs': 'متغیر لګښتونه',
+  'Taxes': 'مالیات',
+  'Personal + Debt': 'شخصي + قرض',
+  'Surplus': 'اضافي پیسې',
   'Reserve Funds Building Up': 'ذخیره فنډونه',
   '1099 Tax Estimate': 'د ۱۰۹۹ مالیه اټکل',
   'Seasonal Rate Outlook': 'فصلي نرخ چشم انداز',
@@ -914,7 +919,7 @@ function App() {
               const marginalProfitPerMile = ratePerMile - variableCostPerMile;
 
               // Fixed costs this month (use known monthly amounts if no expense records for this month)
-              const fixedCosts = monthExpenses.filter(e => ['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer'].includes(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
+              const fixedCosts = monthExpenses.filter(e => ['Insurance', 'Registration', 'Lock Box', 'Trailer'].includes(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
 
               // Revenue after variable costs covers fixed costs first, then personal/debt
               const grossMargin = monthIncome - (monthMiles * variableCostPerMile);
@@ -1148,8 +1153,8 @@ function App() {
             {/* Revenue Waterfall — Money Flow Animation */}
             {(() => {
               // Split business expenses into Fixed and Variable
-              const fixedCategories = new Set(['Insurance', 'Registration', 'Tolls', 'Lock Box', 'Trailer']);
-              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch', 'Food']);
+              const fixedCategories = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer']);
+              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch', 'Food', 'Tolls']);
               const fixedExpenses = monthExpenses.filter(e => fixedCategories.has(e.category)).reduce((s, e) => s + e.amount, 0) || MONTHLY_FIXED_COSTS;
               const variableExpenses = monthExpenses.filter(e => variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0)
                 + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE); // depreciation + maintenance are variable (per-mile)
@@ -1164,11 +1169,11 @@ function App() {
               const afterPersonal = afterTax - personalCosts;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
-                { label: '🏢 Fixed Costs', amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Tolls · Lock Box · Registration', delay: '0s' },
-                { label: '📊 Variable Costs', amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Depreciation · Maint · Food', delay: '0.3s' },
-                { label: '🏛 Taxes', amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
-                { label: '🏠 Personal + Debt', amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
-                { label: '💰 Surplus', amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
+                { label: `🏢 ${bi('Fixed Costs')}`, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
+                { label: `📊 ${bi('Variable Costs')}`, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch 10% · Tolls · Depreciation · Maint · Food', delay: '0.3s' },
+                { label: `🏛 ${bi('Taxes')}`, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
+                { label: `🏠 ${bi('Personal + Debt')}`, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
+                { label: `💰 ${bi('Surplus')}`, amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
               ];
 
               // Reserve fund targets — how much you SHOULD be saving
@@ -1295,7 +1300,7 @@ function App() {
               {[
                 { label: '🛡 Insurance', val: '$2,400/mo', type: 'fixed' },
                 { label: '🚛 Trailer', val: '$600/mo', type: 'fixed' },
-                { label: '🛣 Tolls', val: '$250/mo', type: 'fixed' },
+                { label: '🛣 Tolls', val: '$250/mo', type: 'variable' },
                 { label: '🔒 Lock Box', val: '$100/mo', type: 'fixed' },
                 { label: '📋 Registration', val: '$133/mo', type: 'fixed' },
                 { label: '⛽ Fuel', val: formatCurrency(analysis.trackedFuelCost), type: 'variable' },
