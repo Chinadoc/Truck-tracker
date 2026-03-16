@@ -1039,7 +1039,8 @@ function App() {
               const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
               const mDHest = monthIncomes.length * 40 * fpm;
               const mTollEst = monthIncome * 0.005;
-              const totalTrueCosts = MONTHLY_FIXED_COSTS + monthVarExp + mReserves + mDHest + mTollEst;
+              const mDispatch = monthIncome * 0.10;
+              const totalTrueCosts = MONTHLY_FIXED_COSTS + monthVarExp + mReserves + mDHest + mTollEst + mDispatch;
               const trueNetProfit = monthIncome - totalTrueCosts;
               const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
               const mBeating = trueNetProfit > mCompanyEq;
@@ -1109,7 +1110,8 @@ function App() {
                   const mHiddenCosts = mDeprReserve + mMaintReserve;
                   const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
                   const mVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
-                  const mTotalCosts = MONTHLY_FIXED_COSTS + mVarExp + mHiddenCosts + mDHest + mTollEst;
+                  const mDispatch = monthIncome * 0.10;
+                  const mTotalCosts = MONTHLY_FIXED_COSTS + mVarExp + mHiddenCosts + mDHest + mTollEst + mDispatch;
                   return (
                     <>
                       {[
@@ -1149,7 +1151,8 @@ function App() {
                 const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
                 const mDHest = monthIncomes.length * 40 * fpm;
                 const mTollEst = monthIncome * 0.005;
-                const mTrueProfit = monthIncome - MONTHLY_FIXED_COSTS - monthVarExp - mReserves - mDHest - mTollEst;
+                const mDispatch = monthIncome * 0.10;
+                const mTrueProfit = monthIncome - MONTHLY_FIXED_COSTS - monthVarExp - mReserves - mDHest - mTollEst - mDispatch;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
