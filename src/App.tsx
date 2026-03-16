@@ -622,6 +622,48 @@ function App() {
   const monthDeadhead = useMemo(() => monthIncomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [monthIncomes]);
   const monthPendingRevenue = useMemo(() => monthPendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [monthPendingIncomes]);
 
+  // ★ CENTRALIZED MONTHLY COST ANALYSIS — single source of truth for all dashboard sections
+  const mc = useMemo(() => {
+    const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
+    const numTrips = monthIncomes.length;
+    const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
+    const fuelFromRecords = monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0);
+    const fuelPerMile = monthMiles > 0 ? fuelFromRecords / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
+    const dispatchPerMile = ratePerMile * 0.10;
+    const dispatchTotal = monthIncome * 0.10;
+    const deadheadPerMile = monthMiles > 0 ? (numTrips * 40 * fuelPerMile) / monthMiles : 0;
+    const deadheadTotal = numTrips * 40 * fuelPerMile;
+    const tollsPerMile = ratePerMile * 0.005;
+    const tollsTotal = monthIncome * 0.005;
+    const deprPerMile = CASCADIA_DEPR_RATE;
+    const maintPerMile = CASCADIA_MAINT_RESERVE;
+    const reservesPerMile = deprPerMile + maintPerMile;
+    const reservesTotal = monthMiles * reservesPerMile;
+    const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile;
+    const varTotal = monthMiles * varPerMile; // or: fuelFromRecords + dispatchTotal + deadheadTotal + tollsTotal + reservesTotal
+    const fixedTotal = MONTHLY_FIXED_COSTS;
+    const fixedPerMile = monthMiles > 0 ? fixedTotal / monthMiles : 0;
+    const allInPerMile = varPerMile + fixedPerMile;
+    const marginalPerMile = ratePerMile - varPerMile;
+    const netPerMile = ratePerMile - allInPerMile;
+    // Use only non-fixed expense records for variable (avoid double-counting with MONTHLY_FIXED_COSTS)
+    const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+    // KPI true costs = fixed + actual variable records + reserves + estimates (DH, tolls, dispatch)
+    // but actual records already include fuel+dispatch records, so use per-mile formula for consistency
+    const trueNetProfit = monthIncome - fixedTotal - monthVarExp - reservesTotal - deadheadTotal - tollsTotal - dispatchTotal;
+    const companyDriverEq = monthMiles * COMPANY_DRIVER_RATE;
+    const beating = trueNetProfit > companyDriverEq;
+    return {
+      numTrips, ratePerMile, fuelFromRecords, fuelPerMile,
+      dispatchPerMile, dispatchTotal, deadheadPerMile, deadheadTotal,
+      tollsPerMile, tollsTotal, deprPerMile, maintPerMile,
+      reservesPerMile, reservesTotal, varPerMile, varTotal,
+      fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile,
+      totalTrueCosts: fixedTotal + monthVarExp + reservesTotal + deadheadTotal + tollsTotal + dispatchTotal,
+      trueNetProfit, companyDriverEq, beating, monthVarExp,
+    };
+  }, [monthIncomes, monthExpenses, monthIncome, monthMiles]);
+
   // Previous month summary (for context chip)
   const prevMonthYM = useMemo(() => {
     const [y, m] = selectedMonth.split('-').map(Number);
@@ -915,30 +957,19 @@ function App() {
 
             {/* ★ Monthly Break-Even — Miles-based */}
             {(() => {
-              // Per-mile economics (month-scoped)
-              const numTrips = monthIncomes.length;
-              const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
-              const fuelPerMile = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
-              const dispatchPerMile = ratePerMile * 0.10; // Dispatch is 10% of revenue
-              const deadheadCost = numTrips * 40 * fuelPerMile; // 40 mi deadhead per job at fuel rate
-              const deadheadPerMile = monthMiles > 0 ? deadheadCost / monthMiles : 0;
-              const tollsPerMile = ratePerMile * 0.005; // 0.5% of revenue
-              const variableCostPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
-              const marginalProfitPerMile = ratePerMile - variableCostPerMile;
-
-              // Fixed costs this month (always use known monthly amounts)
-              const fixedCosts = MONTHLY_FIXED_COSTS;
+              // All per-mile economics from centralized mc
+              const { varPerMile, marginalPerMile, fixedTotal } = mc;
 
               // Revenue after variable costs covers fixed costs first, then personal/debt
-              const grossMargin = monthIncome - (monthMiles * variableCostPerMile);
-              const afterFixed = grossMargin - fixedCosts;
+              const grossMargin = monthIncome - (monthMiles * varPerMile);
+              const afterFixed = grossMargin - fixedTotal;
 
               // Personal + debt obligations
               const personalNeed = totalPersonalMonthly;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const takeHomeNeed = personalNeed + debtPayment;
               const shortfall = Math.max(0, takeHomeNeed - Math.max(0, afterFixed));
-              const milesNeeded = marginalProfitPerMile > 0 ? Math.ceil((fixedCosts + takeHomeNeed - grossMargin) / marginalProfitPerMile) : 0;
+              const milesNeeded = marginalPerMile > 0 ? Math.ceil((fixedTotal + takeHomeNeed - grossMargin) / marginalPerMile) : 0;
               const pctCovered = takeHomeNeed > 0 ? Math.min(100, (Math.max(0, afterFixed) / takeHomeNeed) * 100) : 100;
               const goalMet = afterFixed >= takeHomeNeed;
 
@@ -947,56 +978,49 @@ function App() {
                 <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>📊 {bi('Monthly Break-Even')}</h3>
 
-                  {/* Per-mile economics strip */}
-                  {(() => {
-                    const fixedPerMile = monthMiles > 0 ? fixedCosts / monthMiles : 0;
-                    const allInCostPerMile = variableCostPerMile + fixedPerMile;
-                    const trueNetPerMile = ratePerMile - allInCostPerMile;
-                    return (
-                      <>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.35rem', marginBottom: '0.4rem', fontSize: '0.65rem' }}>
+                  {/* Per-mile economics strip — all from centralized mc */}
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.35rem', marginBottom: '0.4rem', fontSize: '0.65rem' }}>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Rate</div>
-                            <div style={{ fontWeight: 800, color: 'var(--success)' }}>${ratePerMile.toFixed(2)}/mi</div>
+                            <div style={{ fontWeight: 800, color: 'var(--success)' }}>${mc.ratePerMile.toFixed(2)}/mi</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Variable</div>
-                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${variableCostPerMile.toFixed(2)}/mi</div>
+                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.varPerMile.toFixed(2)}/mi</div>
                             <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>fuel+dh+disp+tolls+depr+maint</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center', border: '1px solid rgba(234,179,8,0.25)' }}>
                             <div style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Fixed/Mi ↓</div>
-                            <div style={{ fontWeight: 800, color: '#eab308' }}>-${fixedPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>{formatCurrency(fixedCosts)}/mo</div>
+                            <div style={{ fontWeight: 800, color: '#eab308' }}>-${mc.fixedPerMile.toFixed(2)}/mi</div>
+                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>{formatCurrency(mc.fixedTotal)}/mo</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>All-In</div>
-                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${allInCostPerMile.toFixed(2)}/mi</div>
+                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.allInPerMile.toFixed(2)}/mi</div>
                             <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>var + fixed spread</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Marginal</div>
-                            <div style={{ fontWeight: 800, color: '#10b981' }}>${marginalProfitPerMile.toFixed(2)}/mi</div>
+                            <div style={{ fontWeight: 800, color: '#10b981' }}>${mc.marginalPerMile.toFixed(2)}/mi</div>
                             <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>next mile earns</div>
                           </div>
                           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
                             <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>True Net/Mi</div>
-                            <div style={{ fontWeight: 800, color: trueNetPerMile >= 0 ? 'var(--success)' : 'var(--danger)' }}>${trueNetPerMile.toFixed(2)}/mi</div>
+                            <div style={{ fontWeight: 800, color: mc.netPerMile >= 0 ? 'var(--success)' : 'var(--danger)' }}>${mc.netPerMile.toFixed(2)}/mi</div>
                             <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>avg all costs</div>
                           </div>
                         </div>
-                        {/* Fixed cost dilution — shows how fixed/mi drops with more miles */}
+                        {/* Fixed cost dilution */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', padding: '0.35rem 0.6rem', background: 'rgba(234,179,8,0.06)', borderRadius: '6px', border: '1px solid rgba(234,179,8,0.15)', fontSize: '0.55rem', color: '#eab308' }}>
                           <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>📉 Fixed dilution:</span>
                           <span className="text-secondary" style={{ fontSize: '0.5rem' }}>
-                            {formatCurrency(fixedCosts)}/mo ({formatCurrency(fixedCosts * 12)}/yr) →
-                            {monthMiles > 0 ? ` @ ${monthMiles.toLocaleString()} mi = $${fixedPerMile.toFixed(2)}/mi` : ' drive more to dilute'}
-                            {monthMiles > 0 && ` · @ 15k mi = $${(fixedCosts / 15000).toFixed(2)}/mi · @ 20k mi = $${(fixedCosts / 20000).toFixed(2)}/mi`}
+                            {formatCurrency(mc.fixedTotal)}/mo ({formatCurrency(mc.fixedTotal * 12)}/yr) →
+                            {monthMiles > 0 ? ` @ ${monthMiles.toLocaleString()} mi = $${mc.fixedPerMile.toFixed(2)}/mi` : ' drive more to dilute'}
+                            {monthMiles > 0 && ` · @ 15k mi = $${(mc.fixedTotal / 15000).toFixed(2)}/mi · @ 20k mi = $${(mc.fixedTotal / 20000).toFixed(2)}/mi`}
                           </span>
                         </div>
                       </>
-                    );
-                  })()}
 
                   {/* Progress toward personal + debt */}
                   <div style={{ marginBottom: '0.5rem' }}>
@@ -1018,7 +1042,7 @@ function App() {
                       <div className="text-secondary" style={{ fontSize: '0.55rem' }}>
                         {goalMet
                           ? 'Fixed costs covered · Personal + debt fully funded'
-                          : `@ $${marginalProfitPerMile.toFixed(2)}/mi marginal · ${formatCurrency(shortfall)} shortfall`}
+                          : `@ $${marginalPerMile.toFixed(2)}/mi marginal · ${formatCurrency(shortfall)} shortfall`}
                       </div>
                     </div>
                     {!goalMet && <div style={{ textAlign: 'right' }}>
@@ -1030,21 +1054,7 @@ function App() {
               );
             })()}
 
-            {/* Row 1: Big Picture */}
-            {(() => {
-              // Exclude fixed-category and food expense records — they're covered by MONTHLY_FIXED_COSTS and Personal
-              const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
-              const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
-              const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
-              const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
-              const mDHest = monthIncomes.length * 40 * fpm;
-              const mTollEst = monthIncome * 0.005;
-              const mDispatch = monthIncome * 0.10;
-              const totalTrueCosts = MONTHLY_FIXED_COSTS + monthVarExp + mReserves + mDHest + mTollEst + mDispatch;
-              const trueNetProfit = monthIncome - totalTrueCosts;
-              const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
-              const mBeating = trueNetProfit > mCompanyEq;
-              return (
+            {/* Row 1: Big Picture — all from centralized mc */}
             <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-success justify-center" style={{ marginBottom: '0.25rem' }}><TrendingUp size={14} /> Gross Revenue</div>
@@ -1054,17 +1064,15 @@ function App() {
               </div>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}><TrendingDown size={14} /> Total True Costs</div>
-                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalTrueCosts)}</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(mc.totalTrueCosts)}</div>
                 <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fixed + Variable + Reserves</div>
               </div>
-              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderTop: `4px solid ${mBeating ? 'var(--success)' : 'var(--danger)'}` }}>
-                <div className="stat-title justify-center" style={{ color: mBeating ? 'var(--success)' : 'var(--danger)', marginBottom: '0.25rem' }}><DollarSign size={14} /> True Net Profit</div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: mBeating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit)}</div>
+              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderTop: `4px solid ${mc.beating ? 'var(--success)' : 'var(--danger)'}` }}>
+                <div className="stat-title justify-center" style={{ color: mc.beating ? 'var(--success)' : 'var(--danger)', marginBottom: '0.25rem' }}><DollarSign size={14} /> True Net Profit</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: mc.beating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mc.trueNetProfit)}</div>
                 <div className="text-secondary" style={{ fontSize: '0.8rem' }}>After ALL costs & reserves</div>
               </div>
             </div>
-              );
-            })()}
 
             {/* Row 2: Two panels */}
             <div className="grid-2-1" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -1074,21 +1082,13 @@ function App() {
                   <Calculator size={18} className="text-accent" /> {bi('Where Every Dollar Goes (Per Mile)')}
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  {(() => {
-                    const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
-                    const dhPerMile = monthMiles > 0 ? (monthIncomes.length * 40 * fpm) / monthMiles : 0;
-                    const tollsPerMile = (monthIncome / Math.max(1, monthMiles)) * 0.005;
-                    const dispatchPerMile = (monthIncome / Math.max(1, monthMiles)) * 0.10;
-                    const allVarPerMile = fpm + dhPerMile + tollsPerMile + dispatchPerMile + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
-                    const trueNetPerMile = (monthIncome / Math.max(1, monthMiles)) - allVarPerMile;
-                    return [
-                    { label: 'Avg Rate', value: `$${(monthIncome / Math.max(1, monthMiles)).toFixed(2)}`, color: 'var(--success)', sub: 'per loaded mi' },
-                    { label: 'Fuel+DH', value: `-$${(fpm + dhPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `fuel + 40mi/trip dh` },
-                    { label: 'Disp+Tolls', value: `-$${(dispatchPerMile + tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: '10% + 0.5% of rev' },
-                    { label: 'Depr+Maint', value: `-$${(CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE).toFixed(3)}`, color: '#eab308', sub: 'reserves/mi' },
-                    { label: 'TRUE Net/mi', value: `$${trueNetPerMile.toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
-                    ];
-                  })().map((item, i) => (
+                  {[
+                    { label: 'Avg Rate', value: `$${mc.ratePerMile.toFixed(2)}`, color: 'var(--success)', sub: 'per loaded mi' },
+                    { label: 'Fuel+DH', value: `-$${(mc.fuelPerMile + mc.deadheadPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `fuel + 40mi/trip dh` },
+                    { label: 'Disp+Tolls', value: `-$${(mc.dispatchPerMile + mc.tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: '10% + 0.5% of rev' },
+                    { label: 'Depr+Maint', value: `-$${mc.reservesPerMile.toFixed(3)}`, color: '#eab308', sub: 'reserves/mi' },
+                    { label: 'TRUE Net/mi', value: `$${mc.marginalPerMile.toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
+                  ].map((item, i) => (
                     <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{item.label}</div>
                       <div style={{ fontSize: '1.15rem', fontWeight: 800, color: item.color }}>{item.value}</div>
@@ -1100,91 +1100,63 @@ function App() {
                 <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Wrench size={14} /> {bi('Expense Buckets (Filling Up)')}
                 </h4>
-                {(() => {
-                  const mFuelCost = monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0);
-                  const fpm = monthMiles > 0 ? mFuelCost / monthMiles : 0;
-                  const mDeprReserve = monthMiles * CASCADIA_DEPR_RATE;
-                  const mMaintReserve = monthMiles * CASCADIA_MAINT_RESERVE;
-                  const mDHest = monthIncomes.length * 40 * fpm;
-                  const mTollEst = monthIncome * 0.005;
-                  const mHiddenCosts = mDeprReserve + mMaintReserve;
-                  const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
-                  const mVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
-                  const mDispatch = monthIncome * 0.10;
-                  const mTotalCosts = MONTHLY_FIXED_COSTS + mVarExp + mHiddenCosts + mDHest + mTollEst + mDispatch;
-                  return (
-                    <>
-                      {[
-                        { name: 'Diesel & DEF', amount: mFuelCost, color: 'var(--danger)' },
-                        { name: 'Deadhead Est (40mi/trip)', amount: mDHest, color: '#f97316' },
-                        { name: 'Tolls Est (0.5% rev)', amount: mTollEst, color: '#f97316' },
-                        { name: 'Truck Depreciation Reserve', amount: mDeprReserve, color: 'var(--danger)' },
-                        { name: 'Maintenance & Tires Reserve', amount: mMaintReserve, color: '#eab308' },
-                      ].map((b, i) => {
-                        const pct = mTotalCosts > 0 ? (b.amount / mTotalCosts) * 100 : 0;
-                        return (
-                          <div key={i} style={{ marginBottom: '0.75rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
-                              <span>{b.name}</span>
-                              <span>{formatCurrency(b.amount)}</span>
-                            </div>
-                            <div className="bucket-bar-bg">
-                              <div className="bucket-bar-fill" style={{ background: b.color, width: `${Math.min(100, pct * 2)}%`, opacity: 0.8 }}></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="text-secondary" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Hidden Reserves Set Aside:</span>
-                        <span className="text-danger" style={{ fontSize: '1.1rem', fontWeight: 800 }}>-{formatCurrency(mHiddenCosts)}</span>
+                <>
+                  {[
+                    { name: 'Diesel & DEF', amount: mc.fuelFromRecords, color: 'var(--danger)' },
+                    { name: 'Deadhead Est (40mi/trip)', amount: mc.deadheadTotal, color: '#f97316' },
+                    { name: 'Tolls Est (0.5% rev)', amount: mc.tollsTotal, color: '#f97316' },
+                    { name: 'Truck Depreciation Reserve', amount: monthMiles * mc.deprPerMile, color: 'var(--danger)' },
+                    { name: 'Maintenance & Tires Reserve', amount: monthMiles * mc.maintPerMile, color: '#eab308' },
+                  ].map((b, i) => {
+                    const pct = mc.totalTrueCosts > 0 ? (b.amount / mc.totalTrueCosts) * 100 : 0;
+                    return (
+                      <div key={i} style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+                          <span>{b.name}</span>
+                          <span>{formatCurrency(b.amount)}</span>
+                        </div>
+                        <div className="bucket-bar-bg">
+                          <div className="bucket-bar-fill" style={{ background: b.color, width: `${Math.min(100, pct * 2)}%`, opacity: 0.8 }}></div>
+                        </div>
                       </div>
-                    </>
-                  );
-                })()}
+                    );
+                  })}
+
+                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="text-secondary" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Hidden Reserves Set Aside:</span>
+                    <span className="text-danger" style={{ fontSize: '1.1rem', fontWeight: 800 }}>-{formatCurrency(mc.reservesTotal)}</span>
+                  </div>
+                </>
               </div>
 
-              {(() => {
-                const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
-                const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
-                const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
-                const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
-                const mDHest = monthIncomes.length * 40 * fpm;
-                const mTollEst = monthIncome * 0.005;
-                const mDispatch = monthIncome * 0.10;
-                const mTrueProfit = monthIncome - MONTHLY_FIXED_COSTS - monthVarExp - mReserves - mDHest - mTollEst - mDispatch;
-                const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
-                const mBeating = mTrueProfit > mCompanyEq;
-                return (
-                  <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={18} className="text-accent" /> {bi('Head-to-Head')}</h3>
-                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                      <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><DollarSign size={56} /></div>
-                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Company Driver</div>
-                      <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(mCompanyEq)}</div>
-                      <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Guaranteed @ ${COMPANY_DRIVER_RATE.toFixed(2)}/mi · {monthMiles.toLocaleString()} mi</div>
+              {/* Head-to-Head — all from centralized mc */}
+              <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={18} className="text-accent" /> {bi('Head-to-Head')}</h3>
+                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                  <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><DollarSign size={56} /></div>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Company Driver</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(mc.companyDriverEq)}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Guaranteed @ ${COMPANY_DRIVER_RATE.toFixed(2)}/mi · {monthMiles.toLocaleString()} mi</div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.25rem 0', position: 'relative', zIndex: 1 }}>
+                  <span style={{ background: '#000', color: 'var(--text-secondary)', fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 800, padding: '0.2rem 0.75rem', borderRadius: '20px', border: '1px solid var(--border)' }}>VS</span>
+                </div>
+                <div style={{ background: mc.beating ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', borderRadius: '12px', padding: '1.25rem', border: `1px solid ${mc.beating ? 'var(--success)' : 'var(--danger)'}`, position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                  <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><Truck size={56} /></div>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: mc.beating ? 'var(--success)' : 'var(--danger)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Owner-Operator True Net</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: mc.beating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mc.trueNetProfit)}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>After all costs + {formatCurrency(mc.reservesTotal)} reserves</div>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>You're making</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: mc.trueNetProfit - mc.companyDriverEq >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {formatCurrency(mc.trueNetProfit - mc.companyDriverEq)}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.25rem 0', position: 'relative', zIndex: 1 }}>
-                      <span style={{ background: '#000', color: 'var(--text-secondary)', fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 800, padding: '0.2rem 0.75rem', borderRadius: '20px', border: '1px solid var(--border)' }}>VS</span>
-                    </div>
-                    <div style={{ background: mBeating ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', borderRadius: '12px', padding: '1.25rem', border: `1px solid ${mBeating ? 'var(--success)' : 'var(--danger)'}`, position: 'relative', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                      <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><Truck size={56} /></div>
-                      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: mBeating ? 'var(--success)' : 'var(--danger)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Owner-Operator True Net</div>
-                      <div style={{ fontSize: '2rem', fontWeight: 800, color: mBeating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mTrueProfit)}</div>
-                      <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>After all costs + {formatCurrency(mReserves)} reserves</div>
-                    </div>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>You're making</div>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: mTrueProfit - mCompanyEq >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                          {formatCurrency(mTrueProfit - mCompanyEq)}
-                        </div>
-                        <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.15rem' }}>{mTrueProfit - mCompanyEq >= 0 ? 'MORE' : 'LESS'} than a company driver</div>
-                      </div>
-                    </div>
+                    <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.15rem' }}>{mc.trueNetProfit - mc.companyDriverEq >= 0 ? 'MORE' : 'LESS'} than a company driver</div>
                   </div>
-                );
-              })()}
+                </div>
+              </div>
             </div>
 
             {/* Revenue Waterfall — Money Flow Animation */}
