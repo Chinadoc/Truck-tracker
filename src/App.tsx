@@ -1040,15 +1040,15 @@ function App() {
               </div>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}><TrendingDown size={14} /> Total True Costs</div>
-                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(monthTotalExpenses + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE) + monthIncomes.length * 40 * (monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0) + monthIncome * 0.005)}</div>
-                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fuel + DH + Tolls + Reserves</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(monthTotalExpenses + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE) + monthIncomes.length * 40 * (monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0) + monthIncome * 0.005 + MONTHLY_FIXED_COSTS)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fixed + Variable + Reserves</div>
               </div>
               {(() => {
                 const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
                 const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
                 const mDHest = monthIncomes.length * 40 * fpm;
                 const mTollEst = monthIncome * 0.005;
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst;
+                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst - MONTHLY_FIXED_COSTS;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
@@ -1141,7 +1141,7 @@ function App() {
                 const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
                 const mDHest = monthIncomes.length * 40 * fpm;
                 const mTollEst = monthIncome * 0.005;
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst;
+                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst - MONTHLY_FIXED_COSTS;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
