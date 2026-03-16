@@ -1701,7 +1701,6 @@ function App() {
               const fixedItems = [
                 { name: 'Truck Insurance', monthly: 2400, icon: '🛡' },
                 { name: 'Trailer Rental', monthly: 600, icon: '🚛' },
-                { name: 'Tolls & Scales', monthly: 250, icon: '🛣' },
                 { name: 'Registration', monthly: Math.round(1600 / 12 * 100) / 100, icon: '📋' },
                 { name: 'Lock Box', monthly: 100, icon: '🔒' },
               ];
@@ -1710,10 +1709,10 @@ function App() {
               const variableItems = [
                 { name: 'Fuel (Diesel + DEF)', amount: analysis.trackedFuelCost, rate: `$${(analysis.trackedFuelCost / Math.max(1, totalMiles)).toFixed(2)}/mi`, icon: '⛽' },
                 { name: 'Dispatch (10%)', amount: totalIncome * 0.10, rate: '10% of revenue', icon: '📞' },
+                { name: 'Tolls Est (0.5%)', amount: totalIncome * 0.005, rate: '0.5% of revenue', icon: '🛣' },
+                { name: 'Deadhead Est (40mi/trip)', amount: completedIncomes.length * 40 * (totalMiles > 0 ? analysis.trackedFuelCost / totalMiles : 0), rate: '40mi/trip at fuel rate', icon: '🚚' },
                 { name: 'Depreciation Reserve', amount: analysis.vehicleDepreciation, rate: `$${CASCADIA_DEPR_RATE.toFixed(3)}/mi`, icon: '📉' },
                 { name: 'Maintenance Reserve', amount: analysis.maintReserve, rate: `$${CASCADIA_MAINT_RESERVE.toFixed(2)}/mi`, icon: '🔧' },
-                { name: 'Deadhead Fuel', amount: expenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), rate: `${totalDeadhead} empty mi`, icon: '🔄' },
-                { name: 'Road Food', amount: expenses.filter(e => e.category === 'Food').reduce((s, e) => s + e.amount, 0), rate: '~$20/day on road', icon: '🍔' },
               ];
               const totalVariable = variableItems.reduce((s, v) => s + v.amount, 0);
 
