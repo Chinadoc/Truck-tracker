@@ -1031,6 +1031,19 @@ function App() {
             })()}
 
             {/* Row 1: Big Picture */}
+            {(() => {
+              // Exclude fixed-category and food expense records — they're covered by MONTHLY_FIXED_COSTS and Personal
+              const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
+              const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+              const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
+              const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
+              const mDHest = monthIncomes.length * 40 * fpm;
+              const mTollEst = monthIncome * 0.005;
+              const totalTrueCosts = MONTHLY_FIXED_COSTS + monthVarExp + mReserves + mDHest + mTollEst;
+              const trueNetProfit = monthIncome - totalTrueCosts;
+              const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
+              const mBeating = trueNetProfit > mCompanyEq;
+              return (
             <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-success justify-center" style={{ marginBottom: '0.25rem' }}><TrendingUp size={14} /> Gross Revenue</div>
@@ -1040,26 +1053,17 @@ function App() {
               </div>
               <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center' }}>
                 <div className="stat-title text-danger justify-center" style={{ marginBottom: '0.25rem' }}><TrendingDown size={14} /> Total True Costs</div>
-                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(monthTotalExpenses + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE) + monthIncomes.length * 40 * (monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0) + monthIncome * 0.005 + MONTHLY_FIXED_COSTS)}</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{formatCurrency(totalTrueCosts)}</div>
                 <div className="text-secondary" style={{ fontSize: '0.8rem' }}>Fixed + Variable + Reserves</div>
               </div>
-              {(() => {
-                const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
-                const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
-                const mDHest = monthIncomes.length * 40 * fpm;
-                const mTollEst = monthIncome * 0.005;
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst - MONTHLY_FIXED_COSTS;
-                const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
-                const mBeating = mTrueProfit > mCompanyEq;
-                return (
-                  <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderTop: `4px solid ${mBeating ? 'var(--success)' : 'var(--danger)'}` }}>
-                    <div className="stat-title justify-center" style={{ color: mBeating ? 'var(--success)' : 'var(--danger)', marginBottom: '0.25rem' }}><DollarSign size={14} /> True Net Profit</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 800, color: mBeating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mTrueProfit)}</div>
-                    <div className="text-secondary" style={{ fontSize: '0.8rem' }}>After ALL costs & reserves</div>
-                  </div>
-                );
-              })()}
+              <div className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', borderTop: `4px solid ${mBeating ? 'var(--success)' : 'var(--danger)'}` }}>
+                <div className="stat-title justify-center" style={{ color: mBeating ? 'var(--success)' : 'var(--danger)', marginBottom: '0.25rem' }}><DollarSign size={14} /> True Net Profit</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: mBeating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(trueNetProfit)}</div>
+                <div className="text-secondary" style={{ fontSize: '0.8rem' }}>After ALL costs & reserves</div>
+              </div>
             </div>
+              );
+            })()}
 
             {/* Row 2: Two panels */}
             <div className="grid-2-1" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -1103,7 +1107,9 @@ function App() {
                   const mDHest = monthIncomes.length * 40 * fpm;
                   const mTollEst = monthIncome * 0.005;
                   const mHiddenCosts = mDeprReserve + mMaintReserve;
-                  const mTotalCosts = monthTotalExpenses + mHiddenCosts + mDHest + mTollEst;
+                  const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
+                  const mVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+                  const mTotalCosts = MONTHLY_FIXED_COSTS + mVarExp + mHiddenCosts + mDHest + mTollEst;
                   return (
                     <>
                       {[
@@ -1137,11 +1143,13 @@ function App() {
               </div>
 
               {(() => {
+                const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
+                const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
                 const fpm = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : 0;
-                const mHidden = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
+                const mReserves = monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
                 const mDHest = monthIncomes.length * 40 * fpm;
                 const mTollEst = monthIncome * 0.005;
-                const mTrueProfit = monthIncome - monthTotalExpenses - mHidden - mDHest - mTollEst - MONTHLY_FIXED_COSTS;
+                const mTrueProfit = monthIncome - MONTHLY_FIXED_COSTS - monthVarExp - mReserves - mDHest - mTollEst;
                 const mCompanyEq = monthMiles * COMPANY_DRIVER_RATE;
                 const mBeating = mTrueProfit > mCompanyEq;
                 return (
@@ -1160,7 +1168,7 @@ function App() {
                       <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}><Truck size={56} /></div>
                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: mBeating ? 'var(--success)' : 'var(--danger)', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Owner-Operator True Net</div>
                       <div style={{ fontSize: '2rem', fontWeight: 800, color: mBeating ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mTrueProfit)}</div>
-                      <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>After all costs + {formatCurrency(mHidden)} reserves</div>
+                      <div className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>After all costs + {formatCurrency(mReserves)} reserves</div>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                       <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)', textAlign: 'center' }}>
