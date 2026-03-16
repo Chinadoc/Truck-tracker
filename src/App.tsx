@@ -2045,6 +2045,114 @@ function App() {
                 );
               })()}
 
+              {/* Forecast & Sensitivity Analysis */}
+              {(() => {
+                // Current baseline from actual data
+                const baseFuelPerMi = totalMiles > 0 ? completedExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / totalMiles : REGIONAL_DIESEL['AVG'].price / MPG;
+                const baseRatePerMi = totalMiles > 0 ? totalIncome / totalMiles : 2.0;
+                const baseDispatch = baseRatePerMi * 0.10;
+                const baseDHperMi = completedIncomes.length > 0 ? (completedIncomes.length * 40 * baseFuelPerMi) / totalMiles : 0;
+                const baseTollsPerMi = baseRatePerMi * 0.005;
+                const baseVarPerMi = baseFuelPerMi + baseDispatch + baseDHperMi + baseTollsPerMi + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                void (baseRatePerMi - baseVarPerMi); // baseNetPerMi available if needed
+                const avgMilesPerMonth = totalMiles > 0 ? totalMiles / (completedIncomes.length > 0 ? new Set(completedIncomes.map(i => i.date.slice(0, 7))).size : 1) : 8000;
+                const avgTripsPerMonth = completedIncomes.length > 0 ? completedIncomes.length / new Set(completedIncomes.map(i => i.date.slice(0, 7))).size : 7;
+
+                // Diesel price change math
+                const dieselScenarios = [
+                  { label: 'Current', change: 0, color: 'var(--success)' },
+                  { label: '+$0.50/gal', change: 0.50 / MPG, color: '#eab308' },
+                  { label: '+$1.00/gal', change: 1.00 / MPG, color: 'var(--danger)' },
+                ];
+
+                // Rate sensitivity
+                const rateScenarios = [
+                  { label: 'Current', change: 0, color: 'var(--success)' },
+                  { label: '-$0.25/mi', change: -0.25, color: '#eab308' },
+                  { label: '-$0.50/mi', change: -0.50, color: 'var(--danger)' },
+                ];
+
+                // Annual projection
+                const monthsActive = new Set(completedIncomes.map(i => i.date.slice(0, 7))).size || 1;
+                const projAnnualMiles = avgMilesPerMonth * 12;
+                const projAnnualRev = baseRatePerMi * projAnnualMiles;
+                const projAnnualVarCost = baseVarPerMi * projAnnualMiles;
+                const projAnnualFixedCost = MONTHLY_FIXED_COSTS * 12;
+                const projAnnualNet = projAnnualRev - projAnnualVarCost - projAnnualFixedCost;
+
+                return (
+                <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #8b5cf6' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🔮 {bi('Forecast & Sensitivity')}</h3>
+
+                  {/* Diesel Price Sensitivity */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>⛽ If Diesel Prices Change</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      {dieselScenarios.map((s, i) => {
+                        const newFuelPerMi = baseFuelPerMi + s.change;
+                        const newDHperMi = completedIncomes.length > 0 ? (completedIncomes.length * 40 * newFuelPerMi) / totalMiles : 0;
+                        const newVarPerMi = newFuelPerMi + baseDispatch + newDHperMi + baseTollsPerMi + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                        const monthlyImpact = (newVarPerMi - baseVarPerMi) * avgMilesPerMonth;
+                        const newNetPerMi = baseRatePerMi - newVarPerMi;
+                        return (
+                          <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Fuel: ${newFuelPerMi.toFixed(2)}/mi</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
+                            {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>+{formatCurrency(monthlyImpact)}/mo</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Rate Sensitivity */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📉 If Freight Rates Drop</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      {rateScenarios.map((s, i) => {
+                        const newRate = baseRatePerMi + s.change;
+                        const newDispatch = newRate * 0.10;
+                        const newTolls = newRate * 0.005;
+                        const newVarPerMi = baseFuelPerMi + newDispatch + baseDHperMi + newTolls + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                        const newNetPerMi = newRate - newVarPerMi;
+                        const monthlyRevLoss = s.change * avgMilesPerMonth;
+                        return (
+                          <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Rate: ${newRate.toFixed(2)}/mi</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
+                            {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>{formatCurrency(monthlyRevLoss)}/mo rev</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Annual Projection */}
+                  <div>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📅 Projected Annual (based on {monthsActive} month{monthsActive > 1 ? 's' : ''} data)</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                      {[
+                        { label: 'Annual Miles', value: projAnnualMiles.toLocaleString(), color: 'var(--text-primary)' },
+                        { label: 'Gross Revenue', value: formatCurrency(projAnnualRev), color: 'var(--success)' },
+                        { label: 'Total Costs', value: formatCurrency(projAnnualVarCost + projAnnualFixedCost), color: 'var(--danger)' },
+                        { label: 'Net Profit', value: formatCurrency(projAnnualNet), color: projAnnualNet > 0 ? 'var(--success)' : 'var(--danger)' },
+                      ].map((item, i) => (
+                        <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.2rem' }}>{item.label}</div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                      Based on {avgMilesPerMonth.toLocaleString(undefined, {maximumFractionDigits: 0})} mi/mo avg · {avgTripsPerMonth.toFixed(1)} trips/mo · ${baseRatePerMi.toFixed(2)}/mi rate
+                    </div>
+                  </div>
+                </div>
+                );
+              })()}
+
               {/* Cost Reduction Strategies */}
               <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #3b82f6' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>💡 Cost Reduction Strategies</h3>
