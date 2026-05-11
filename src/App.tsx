@@ -1488,30 +1488,22 @@ function App() {
 
             {/* Revenue Waterfall — Money Flow Animation */}
             {(() => {
-              // Split business expenses into Fixed and Variable
-              const fixedCategories = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer']);
-              const variableCategories = new Set(['Fuel', 'Deadhead', 'Dispatch']);
-              const fixedExpenses = MONTHLY_FIXED_COSTS;
-              const numTrips = monthIncomes.length;
-              const fuelPerMile = monthMiles > 0 ? monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0) / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
-              const deadheadEst = numTrips * 40 * fuelPerMile;
-              const tollsEst = monthIncome * 0.005;
-              const variableExpenses = monthExpenses.filter(e => variableCategories.has(e.category)).reduce((s, e) => s + e.amount, 0)
-                + monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE)
-                + deadheadEst + tollsEst; // add deadhead + tolls estimates
-              const otherBizExpenses = monthExpenses.filter(e => !fixedCategories.has(e.category) && !variableCategories.has(e.category) && e.category !== 'Food' && e.category !== 'Tolls').reduce((s, e) => s + e.amount, 0);
-              const mTrueNet = monthIncome - monthTotalExpenses - monthMiles * (CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE);
+              // Use centralized mc calculations — single source of truth, no double-counting
+              const fixedExpenses = mc.fixedTotal;
+              const variableExpenses = mc.monthVarExp; // actual expense records (fuel, dispatch, tolls, deadhead, permits, other)
+              const reservesCost = mc.reservesTotal; // depreciation + maintenance reserves
+              const mTrueNet = mc.trueNetProfit;
               const taxCosts = calculateTax(Math.max(0, mTrueNet)).totalTax;
               const personalCosts = totalPersonalMonthly;
               // Priority: Fixed → Variable → Taxes → Personal → Surplus
               const afterFixed = monthIncome - fixedExpenses;
-              const afterVariable = afterFixed - variableExpenses - otherBizExpenses;
+              const afterVariable = afterFixed - variableExpenses - reservesCost;
               const afterTax = afterVariable - taxCosts;
               const afterPersonal = afterTax - personalCosts;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
                 { label: <>🏢 {bi('Fixed Costs')}</>, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
-                { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + otherBizExpenses, filled: Math.max(0, Math.min(afterFixed, variableExpenses + otherBizExpenses)), color: '#f97316', details: 'Fuel · Dispatch · Deadhead · Tolls · Depr · Maint', delay: '0.3s' },
+                { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + reservesCost, filled: Math.max(0, Math.min(afterFixed, variableExpenses + reservesCost)), color: '#f97316', details: 'Fuel · Dispatch · Tolls · Deadhead · Depr · Maint', delay: '0.3s' },
                 { label: <>🏛 {bi('Taxes')}</>, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
                 { label: <>🏠 {bi('Personal + Debt')}</>, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
                 { label: <>💰 {bi('Surplus')}</>, amount: Math.max(0, afterPersonal), filled: Math.max(0, afterPersonal), color: '#10b981', details: afterPersonal >= 0 ? 'Savings & Growth' : 'In the red', delay: '1.2s' },
