@@ -916,7 +916,7 @@ function App() {
   const monthExpenses = useMemo(() => completedExpenses.filter(e => e.date.startsWith(selectedMonth)), [completedExpenses, selectedMonth]);
   const monthPendingIncomes = useMemo(() => pendingIncomes.filter(i => i.date.startsWith(selectedMonth)), [pendingIncomes, selectedMonth]);
   const monthIncome = useMemo(() => monthIncomes.reduce((s, i) => s + i.totalPayout, 0), [monthIncomes]);
-  const monthTotalExpenses = useMemo(() => monthExpenses.reduce((s, e) => s + e.amount, 0), [monthExpenses]);
+
   const monthMiles = useMemo(() => monthIncomes.reduce((s, i) => s + i.distance, 0), [monthIncomes]);
   const monthDeadhead = useMemo(() => monthIncomes.reduce((s, i) => s + (i.deadheadMiles || 0), 0), [monthIncomes]);
   const monthPendingRevenue = useMemo(() => monthPendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [monthPendingIncomes]);
@@ -1397,14 +1397,12 @@ function App() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#eab308', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>{bi('Fixed Components')} ({formatCurrency(mc.fixedTotal)})</div>
                           <div className="text-secondary" style={{ fontStyle: 'italic', marginBottom: '0.15rem', fontSize: '0.55rem' }}>{bi('Monthly smoothed avg')}:</div>
-                          {Array.from(FIXED_CATS).map(cat => {
-                            const e = expenses.filter(x => x.category === cat);
-                            if (e.length === 0) return null;
-                            const catTotal = e.reduce((s, x) => s + x.amount, 0);
-                            const numMonths = Math.max(1, new Set(expenses.filter(x => FIXED_CATS.has(x.category)).map(x => x.date.substring(0, 7))).size);
-                            const avg = catTotal / numMonths;
-                            return <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi(cat)}:</span> <span>{formatCurrency(avg)}</span></div>;
-                          })}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Insurance')}:</span> <span>{formatCurrency(2065)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Trailer')}:</span> <span>{formatCurrency(600)}</span></div>
+                          {(() => {
+                            const otherFixed = monthExpenses.filter(e => FIXED_CATS.has(e.category) && e.category !== 'Insurance' && e.category !== 'Trailer').reduce((s, e) => s + e.amount, 0);
+                            return otherFixed > 0 ? <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Food')}:</span> <span>{formatCurrency(otherFixed)}</span></div> : null;
+                          })()}
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dotted rgba(255,255,255,0.1)' }}><span>{bi('Personal Need')}:</span> <span>{formatCurrency(totalPersonalMonthly)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Debt Payment')}:</span> <span>{formatCurrency(personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0)}</span></div>
                         </div>
