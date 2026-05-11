@@ -270,6 +270,16 @@ const PS: Record<string, string> = {
   'Income vs Expenses (Monthly)': 'عاید مقابل لګښتونه (میاشتنی)',
   'Where Your Revenue Goes': 'ستاسو عاید چیرته ځي',
   'Monthly Rate History': 'میاشتنی نرخ تاریخ',
+  'Show Component Breakdown': 'د برخو ماتول وښایاست',
+  'Hide Cost Breakdown': 'د لګښت ماتول پټ کړئ',
+  'Variable Components': 'متغیر برخې',
+  'Fixed Components': 'ثابت برخې',
+  'Deadhead Fuel': 'خالي تګ تیل',
+  'Maint Reserve': 'د ساتنې ذخیره',
+  'Other Var': 'نور متغیر',
+  'Monthly smoothed avg': 'میاشتنی اوسط',
+  'Personal Need': 'شخصي اړتیا',
+  'Debt Payment': 'قرض تادیه',
 };
 const bi = (en: string) => <>{en} <span style={{ fontSize: '0.65em', opacity: 0.6, fontFamily: 'system-ui' }}>{PS[en] ?? ''}</span></>;
 
@@ -722,15 +732,6 @@ const buildExpenses = (): Expense[] => {
       description: `Fuel: ${trip.originCity} → ${trip.destCity} (${oLabel.split('(')[0]}→ ${dLabel.split('(')[0]}${ratioLabel})`,
       amount: Math.round(calibratedFuel * 100) / 100,
     });
-    if (trip.deadheadMiles && trip.deadheadMiles > 0) {
-      const rawDhFuel = fuelCostForMiles(trip.deadheadMiles, trip.fuelRegion ?? 'AVG');
-      const calibratedDh = rawDhFuel * ratio;
-      exps.push({
-        id: `dh-${trip.id}`, date: trip.date, category: 'Deadhead',
-        description: `Deadhead (empty): ${trip.deadheadFrom} (${trip.deadheadMiles} mi, ${ratioLabel})`,
-        amount: Math.round(calibratedDh * 100) / 100,
-      });
-    }
   });
 
   // === RECURRING MONTHLY BUSINESS EXPENSES — EXACT PDF AMOUNTS ===
@@ -810,6 +811,7 @@ function App() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
+  const [showBreakEvenDetails, setShowBreakEvenDetails] = useState(false);
 
   // === MONTH CYCLE SELECTOR ===
   const currentYM = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -919,9 +921,13 @@ function App() {
   const monthPendingRevenue = useMemo(() => monthPendingIncomes.reduce((s, i) => s + i.totalPayout, 0), [monthPendingIncomes]);
 
   // ★ CENTRALIZED MONTHLY COST ANALYSIS — single source of truth for all dashboard sections
+  const FIXED_CATS = new Set(['Insurance', 'Trailer', 'Food']);
+
   const mc = useMemo(() => {
     // Fixed cost categories — pulled from actual expense records (not hardcoded)
-    const fixedCats = new Set(['Insurance', 'Trailer', 'Food']);
+    const fixedCats = FIXED_CATS;
+    // Reserve categories — these are handled via per-mile accrual (reservesTotal) so don't hit operating costs directly
+    const reserveCats = new Set(['Maintenance', 'Depreciation']);
     const numTrips = monthIncomes.length;
     const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
 
@@ -930,7 +936,7 @@ function App() {
     const dispatchFromRecords = monthExpenses.filter(e => e.category === 'Dispatch').reduce((s, e) => s + e.amount, 0);
     const tollsFromRecords = monthExpenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0);
     const deadheadFromRecords = monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
-    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category) && !reserveCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
 
     // Per-mile from actuals
     const fuelPerMile = monthMiles > 0 ? fuelFromRecords / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
@@ -1231,7 +1237,14 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h1 className="text-2xl font-bold">{bi('Owner-Operator Command Center')}</h1>
-                  <p className="text-secondary mt-1">2023 Freightliner Cascadia · 290k mi · {monthMiles.toLocaleString()} mi this cycle · {monthDeadhead} mi deadhead</p>
+                  {(() => {
+                    const monthsBefore = completedIncomes.filter(i => i.date.substring(0, 7) < selectedMonth);
+                    const cumMilesBefore = monthsBefore.reduce((s, i) => s + i.distance + (i.deadheadMiles || 0), 0);
+                    const currentOdometer = 290000 + cumMilesBefore;
+                    return (
+                      <p className="text-secondary mt-1">2023 Freightliner Cascadia · {currentOdometer.toLocaleString()} mi · {monthMiles.toLocaleString()} mi this cycle · {monthDeadhead} mi deadhead</p>
+                    );
+                  })()}
                 </div>
                 {/* Month Cycle Selector */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '0.35rem 0.5rem', border: '1px solid var(--border)' }}>
@@ -1342,6 +1355,56 @@ function App() {
                       </span>
                     </div>
                   </>
+
+                  {/* Component Breakdown Expander */}
+                  <button
+                    onClick={() => setShowBreakEvenDetails(!showBreakEvenDetails)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', width: '100%',
+                      background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.65rem',
+                      padding: '0.25rem', cursor: 'pointer', marginBottom: '0.5rem', outline: 'none'
+                    }}
+                  >
+                    {showBreakEvenDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    {showBreakEvenDetails ? bi('Hide Cost Breakdown') : bi('Show Component Breakdown')}
+                  </button>
+
+                  <div style={{
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease-in-out',
+                    maxHeight: showBreakEvenDetails ? '500px' : '0px',
+                    opacity: showBreakEvenDetails ? 1 : 0,
+                    marginBottom: showBreakEvenDetails ? '0.75rem' : '0'
+                  }}>
+                    <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '0.75rem', fontSize: '0.6rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>{bi('Variable Components')} ({formatCurrency(mc.varTotal)})</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Fuel')}:</span> <span>{formatCurrency(mc.fuelFromRecords)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Dispatch')}:</span> <span>{formatCurrency(mc.dispatchTotal)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Tolls')}:</span> <span>{formatCurrency(mc.tollsTotal)}</span></div>
+                          {mc.deadheadTotal > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Deadhead Fuel')}:</span> <span>{formatCurrency(mc.deadheadTotal)}</span></div>}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Maint Reserve')}:</span> <span>{formatCurrency(mc.maintPerMile * monthMiles)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Depreciation')}:</span> <span>{formatCurrency(mc.deprPerMile * monthMiles)}</span></div>
+                          {mc.monthVarExp - (mc.fuelFromRecords + mc.dispatchTotal + mc.tollsTotal + mc.deadheadTotal) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Other Var')}:</span> <span>{formatCurrency(mc.monthVarExp - (mc.fuelFromRecords + mc.dispatchTotal + mc.tollsTotal + mc.deadheadTotal))}</span></div>}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#eab308', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>{bi('Fixed Components')} ({formatCurrency(mc.fixedTotal)})</div>
+                          <div className="text-secondary" style={{ fontStyle: 'italic', marginBottom: '0.15rem', fontSize: '0.55rem' }}>{bi('Monthly smoothed avg')}:</div>
+                          {Array.from(FIXED_CATS).map(cat => {
+                            const e = expenses.filter(x => x.category === cat);
+                            if (e.length === 0) return null;
+                            const catTotal = e.reduce((s, x) => s + x.amount, 0);
+                            const numMonths = Math.max(1, new Set(expenses.filter(x => FIXED_CATS.has(x.category)).map(x => x.date.substring(0, 7))).size);
+                            const avg = catTotal / numMonths;
+                            return <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi(cat)}:</span> <span>{formatCurrency(avg)}</span></div>;
+                          })}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dotted rgba(255,255,255,0.1)' }}><span>{bi('Personal Need')}:</span> <span>{formatCurrency(totalPersonalMonthly)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Debt Payment')}:</span> <span>{formatCurrency(personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0)}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Progress toward personal + debt */}
                   <div style={{ marginBottom: '0.5rem' }}>
