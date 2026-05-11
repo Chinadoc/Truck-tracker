@@ -960,18 +960,23 @@ function App() {
     const reservesPerMile = deprPerMile + maintPerMile;
     const reservesTotal = monthMiles * reservesPerMile;
 
-    // Aggregate per-mile
-    const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile;
+    // Other variable expenses (Permits, Other, Maintenance, etc. — not in named categories above)
+    const otherVarFromRecords = allVarFromRecords - fuelFromRecords - dispatchFromRecords - tollsFromRecords - deadheadFromRecords;
+    const otherVarPerMile = monthMiles > 0 ? otherVarFromRecords / monthMiles : 0;
+
+    // Aggregate per-mile — includes ALL variable costs so per-mile × miles = dollar total
+    const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile + otherVarPerMile;
     const varTotal = allVarFromRecords + reservesTotal;
     const fixedTotal = fixedFromRecords > 0 ? fixedFromRecords : MONTHLY_FIXED_COSTS;
     const fixedPerMile = monthMiles > 0 ? fixedTotal / monthMiles : 0;
     const allInPerMile = varPerMile + fixedPerMile;
     const marginalPerMile = ratePerMile - varPerMile;
-    const netPerMile = ratePerMile - allInPerMile;
-
     // True net = revenue minus ALL costs (actual records + reserves, no double-counting)
     const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal;
     const trueNetProfit = monthIncome - totalTrueCosts;
+    // Net per mile computed directly from trueNetProfit to guarantee consistency
+    const netPerMile = monthMiles > 0 ? trueNetProfit / monthMiles : 0;
+
     const companyDriverEq = monthMiles * COMPANY_DRIVER_RATE;
     const beating = trueNetProfit > companyDriverEq;
     return {
