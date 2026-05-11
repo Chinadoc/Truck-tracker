@@ -300,6 +300,10 @@ const REGIONAL_DIESEL: Record<string, { price: number; label: string }> = {
   'TN': { price: 3.45, label: 'Tennessee ($3.45/gal)' },
   'IN': { price: 3.55, label: 'Indiana ($3.55/gal)' },
   'WV': { price: 3.70, label: 'West Virginia ($3.70/gal)' },
+  'GA': { price: 3.50, label: 'Georgia ($3.50/gal)' },
+  'WA': { price: 4.30, label: 'Washington ($4.30/gal)' },
+  'NC': { price: 3.55, label: 'N. Carolina ($3.55/gal)' },
+  'SC': { price: 3.45, label: 'S. Carolina ($3.45/gal)' },
   'AVG': { price: 3.85, label: 'National Avg ($3.85/gal)' },
 };
 
@@ -308,6 +312,9 @@ const ROUTE_MIDPOINTS: Record<string, string> = {
   'UT-TX': 'NM', 'TX-OH': 'TN', 'OH-NV': 'CO', 'NV-CA': 'NV',
   'CA-TX': 'AZ', 'TX-TX': 'TX', 'TX-PA': 'TN', 'TX-NV': 'NM',
   'OH-TX': 'TN', 'PA-TX': 'TN', 'NV-TX': 'NM',
+  'TX-UT': 'NM', 'UT-CA': 'NV', 'CA-GA': 'TX', 'GA-TX': 'TN',
+  'TX-WA': 'CO', 'WA-AR': 'CO', 'OK-TX': 'TX', 'TX-NC': 'TN',
+  'NC-TX': 'TN',
 };
 
 // Fuel cost — averages origin, midpoint, and destination prices
@@ -438,24 +445,206 @@ const INITIAL_TRIPS: Income[] = [
     departureTime: '2026-02-17T03:00', arrivalTime: '2026-02-18T22:00',
   },
   {
-    id: 't6', date: '2026-02-20',
-    loadId: 'FW-HOU-006', broker: 'Spot Market',
+    id: 't6', date: '2026-02-19',
+    loadId: 'FW-HOU-006', broker: 'Chariot',
     distance: 250, ratePerMile: 700 / 250, totalPayout: 700,
     originCity: 'Fort Worth, TX 76137', destCity: 'Houston, TX 77038',
     originCoords: [32.7555, -97.3308], destCoords: [29.8543, -95.4147],
     fuelRegion: 'TX', destFuelRegion: 'TX',
     deadheadMiles: 15, deadheadFrom: 'Grand Prairie → Fort Worth, TX',
-    departureTime: '2026-02-20T06:00', arrivalTime: '2026-02-20T10:30',
+    departureTime: '2026-02-19T06:00', arrivalTime: '2026-02-20T10:30',
   },
   {
-    id: 't7', date: '2026-02-27',
-    loadId: 'RSB-EST-007', broker: 'Spot Market',
-    distance: 1620, ratePerMile: 3400 / 1620, totalPayout: 3400,
+    id: 't7', date: '2026-02-23',
+    loadId: 'RSB-EST-007', broker: 'RXO',
+    distance: 1620, ratePerMile: 3399 / 1620, totalPayout: 3399,
     originCity: 'Rosenberg, TX 77471', destCity: 'Easton, PA 18040',
     originCoords: [29.5569, -95.8088], destCoords: [40.6910, -75.2207],
     fuelRegion: 'TX', destFuelRegion: 'PA',
     deadheadMiles: 35, deadheadFrom: 'Houston 77038 → Rosenberg, TX',
-    departureTime: '2026-02-27T04:00', arrivalTime: '2026-03-01T08:00',
+    departureTime: '2026-02-23T04:00', arrivalTime: '2026-02-26T08:00',
+  },
+  // === MARCH 2026 LOADS (from PDF) ===
+  {
+    id: 't8', date: '2026-02-27',
+    loadId: 'PA-TX-008', broker: 'MODE',
+    distance: 1600, ratePerMile: 2800 / 1600, totalPayout: 2800,
+    originCity: 'Trenton, NJ 08601', destCity: 'Houston, TX 77001',
+    originCoords: [40.2206, -74.7563], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'PA', destFuelRegion: 'TX',
+    departureTime: '2026-02-27T04:00', arrivalTime: '2026-03-01T18:00',
+  },
+  {
+    id: 't9', date: '2026-03-02',
+    loadId: 'TX-TN-009', broker: 'ONX Logistics',
+    distance: 870, ratePerMile: 2000 / 870, totalPayout: 2000,
+    originCity: 'Houston, TX 77001', destCity: 'Charleston, TN 37310',
+    originCoords: [29.7604, -95.3698], destCoords: [35.2868, -84.8579],
+    fuelRegion: 'TX', destFuelRegion: 'TN',
+    departureTime: '2026-03-02T05:00', arrivalTime: '2026-03-03T20:00',
+  },
+  {
+    id: 't10', date: '2026-03-03',
+    loadId: 'TN-TX-010', broker: 'General',
+    distance: 920, ratePerMile: 1500 / 920, totalPayout: 1500,
+    originCity: 'Chattanooga, TN 37401', destCity: 'Wichita Falls, TX 76301',
+    originCoords: [35.0456, -85.3097], destCoords: [33.9137, -98.4934],
+    fuelRegion: 'TN', destFuelRegion: 'TX',
+    departureTime: '2026-03-03T22:00', arrivalTime: '2026-03-05T14:00',
+  },
+  {
+    id: 't11', date: '2026-03-05',
+    loadId: 'AR-TX-011', broker: 'Platform',
+    distance: 330, ratePerMile: 1050 / 330, totalPayout: 1050,
+    originCity: 'Hope, AR 71801', destCity: 'Houston, TX 77001',
+    originCoords: [33.6673, -93.5916], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'AR', destFuelRegion: 'TX',
+    departureTime: '2026-03-05T06:00', arrivalTime: '2026-03-06T14:00',
+  },
+  {
+    id: 't13', date: '2026-03-05',
+    loadId: 'TX-PA-013', broker: 'Transend',
+    distance: 1520, ratePerMile: 3620 / 1520, totalPayout: 3620,
+    originCity: 'Houston, TX 77001', destCity: 'Milton, PA 17847',
+    originCoords: [29.7604, -95.3698], destCoords: [41.0120, -76.8469],
+    fuelRegion: 'TX', destFuelRegion: 'PA',
+    departureTime: '2026-03-05T08:00', arrivalTime: '2026-03-09T16:00',
+  },
+  {
+    id: 't12', date: '2026-03-06',
+    loadId: 'PA-TX-012', broker: 'Augured',
+    distance: 1700, ratePerMile: 3450 / 1700, totalPayout: 3450,
+    originCity: 'Mountain Top, PA 18707', destCity: 'Sherwood, TX 76941',
+    originCoords: [41.1376, -75.8774], destCoords: [31.2279, -100.7553],
+    fuelRegion: 'PA', destFuelRegion: 'TX',
+    departureTime: '2026-03-06T05:00', arrivalTime: '2026-03-12T14:00',
+  },
+  {
+    id: 't14', date: '2026-03-12',
+    loadId: 'TX-TX-014', broker: 'ADL',
+    distance: 280, ratePerMile: 850 / 280, totalPayout: 850,
+    originCity: 'Coppell, TX 75019', destCity: 'Houston, TX 77001',
+    originCoords: [32.9546, -97.0150], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'TX', destFuelRegion: 'TX',
+    departureTime: '2026-03-12T06:00', arrivalTime: '2026-03-13T12:00',
+  },
+  {
+    id: 't15', date: '2026-03-16',
+    loadId: 'TX-TN-015', broker: 'J.B. Hunt',
+    distance: 870, ratePerMile: 2050 / 870, totalPayout: 2050,
+    originCity: 'Houston, TX 77001', destCity: 'Nashville, TN 37201',
+    originCoords: [29.7604, -95.3698], destCoords: [36.1627, -86.7816],
+    fuelRegion: 'TX', destFuelRegion: 'TN',
+    departureTime: '2026-03-16T04:00', arrivalTime: '2026-03-18T14:00',
+  },
+  {
+    id: 't16', date: '2026-03-18',
+    loadId: 'NC-TX-016', broker: 'Evans',
+    distance: 1200, ratePerMile: 1950 / 1200, totalPayout: 1950,
+    originCity: 'Charlotte, NC 28201', destCity: 'Houston, TX 77001',
+    originCoords: [35.2271, -80.8431], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'NC', destFuelRegion: 'TX',
+    departureTime: '2026-03-18T05:00', arrivalTime: '2026-03-20T18:00',
+  },
+  // === APRIL 2026 LOADS (from PDF) ===
+  {
+    id: 't17', date: '2026-03-30',
+    loadId: 'TX-UT-017', broker: 'Mid America',
+    distance: 1300, ratePerMile: 3450 / 1300, totalPayout: 3450,
+    originCity: 'Houston, TX 77001', destCity: 'Salt Lake City, UT 84101',
+    originCoords: [29.7604, -95.3698], destCoords: [40.7608, -111.8910],
+    fuelRegion: 'TX', destFuelRegion: 'UT',
+    departureTime: '2026-03-30T04:00', arrivalTime: '2026-04-01T14:00',
+  },
+  {
+    id: 't18', date: '2026-03-31',
+    loadId: 'UT-CA-018', broker: 'TQL',
+    distance: 680, ratePerMile: 1821.73 / 680, totalPayout: 1821.73,
+    originCity: 'Salt Lake City, UT 84101', destCity: 'Los Angeles, CA 90001',
+    originCoords: [40.7608, -111.8910], destCoords: [34.0522, -118.2437],
+    fuelRegion: 'UT', destFuelRegion: 'CA',
+    departureTime: '2026-03-31T06:00', arrivalTime: '2026-04-02T12:00',
+  },
+  {
+    id: 't19', date: '2026-04-03',
+    loadId: 'CA-GA-019', broker: 'Priority',
+    distance: 2200, ratePerMile: 5100 / 2200, totalPayout: 5100,
+    originCity: 'Los Angeles, CA 90001', destCity: 'Atlanta, GA 30301',
+    originCoords: [34.0522, -118.2437], destCoords: [33.7490, -84.3880],
+    fuelRegion: 'CA', destFuelRegion: 'GA',
+    departureTime: '2026-04-03T04:00', arrivalTime: '2026-04-06T14:00',
+  },
+  {
+    id: 't20', date: '2026-04-06',
+    loadId: 'GA-TX-020', broker: 'Southland',
+    distance: 800, ratePerMile: 1600 / 800, totalPayout: 1600,
+    originCity: 'Atlanta, GA 30301', destCity: 'Houston, TX 77001',
+    originCoords: [33.7490, -84.3880], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'GA', destFuelRegion: 'TX',
+    departureTime: '2026-04-06T16:00', arrivalTime: '2026-04-08T12:00',
+  },
+  {
+    id: 't21', date: '2026-04-09',
+    loadId: 'TX-WA-021', broker: 'High Tide',
+    distance: 2300, ratePerMile: 6500 / 2300, totalPayout: 6500,
+    originCity: 'Houston, TX 77001', destCity: 'Seattle, WA 98101',
+    originCoords: [29.7604, -95.3698], destCoords: [47.6062, -122.3321],
+    fuelRegion: 'TX', destFuelRegion: 'WA',
+    departureTime: '2026-04-09T04:00', arrivalTime: '2026-04-13T10:00',
+  },
+  {
+    id: 't22', date: '2026-04-13',
+    loadId: 'WA-AR-022', broker: 'LSI',
+    distance: 2100, ratePerMile: 4000 / 2100, totalPayout: 4000,
+    originCity: 'Seattle, WA 98101', destCity: 'Little Rock, AR 72201',
+    originCoords: [47.6062, -122.3321], destCoords: [34.7465, -92.2896],
+    fuelRegion: 'WA', destFuelRegion: 'AR',
+    departureTime: '2026-04-13T14:00', arrivalTime: '2026-04-17T10:00',
+  },
+  {
+    id: 't23', date: '2026-04-17',
+    loadId: 'OK-TX-023', broker: 'Merrell',
+    distance: 400, ratePerMile: 1200 / 400, totalPayout: 1200,
+    originCity: 'Oklahoma City, OK 73101', destCity: 'Houston, TX 77001',
+    originCoords: [35.4676, -97.5164], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'OK', destFuelRegion: 'TX',
+    departureTime: '2026-04-17T14:00', arrivalTime: '2026-04-20T08:00',
+  },
+  {
+    id: 't24', date: '2026-04-20',
+    loadId: 'TX-NC-024', broker: 'ONX',
+    distance: 1200, ratePerMile: 3200 / 1200, totalPayout: 3200,
+    originCity: 'Houston, TX 77001', destCity: 'Charlotte, NC 28201',
+    originCoords: [29.7604, -95.3698], destCoords: [35.2271, -80.8431],
+    fuelRegion: 'TX', destFuelRegion: 'NC',
+    departureTime: '2026-04-20T10:00', arrivalTime: '2026-04-21T22:00',
+  },
+  {
+    id: 't25', date: '2026-04-22',
+    loadId: 'NC-TX-025', broker: 'Armstrong',
+    distance: 1200, ratePerMile: 2375 / 1200, totalPayout: 2375,
+    originCity: 'Charlotte, NC 28201', destCity: 'Houston, TX 77001',
+    originCoords: [35.2271, -80.8431], destCoords: [29.7604, -95.3698],
+    fuelRegion: 'NC', destFuelRegion: 'TX',
+    departureTime: '2026-04-22T05:00', arrivalTime: '2026-04-24T14:00',
+  },
+  {
+    id: 't26', date: '2026-04-24',
+    loadId: 'TX-NV-026', broker: 'TBRA',
+    distance: 1600, ratePerMile: 5000 / 1600, totalPayout: 5000,
+    originCity: 'Houston, TX 77001', destCity: 'Las Vegas, NV 89101',
+    originCoords: [29.7604, -95.3698], destCoords: [36.1699, -115.1398],
+    fuelRegion: 'TX', destFuelRegion: 'NV',
+    departureTime: '2026-04-24T04:00', arrivalTime: '2026-04-27T10:00',
+  },
+  {
+    id: 't27', date: '2026-04-27',
+    loadId: 'NV-CA-027', broker: 'AVA',
+    distance: 270, ratePerMile: 950 / 270, totalPayout: 950,
+    originCity: 'Las Vegas, NV 89101', destCity: 'Los Angeles, CA 90001',
+    originCoords: [36.1699, -115.1398], destCoords: [34.0522, -118.2437],
+    fuelRegion: 'NV', destFuelRegion: 'CA',
+    departureTime: '2026-04-27T06:00', arrivalTime: '2026-04-27T12:00',
   },
 ];
 
@@ -481,17 +670,56 @@ const buildExpenses = (): Expense[] => {
     }
   });
 
-  // === RECURRING MONTHLY BUSINESS EXPENSES (Feb 2026) ===
-  const totalRevenue = INITIAL_TRIPS.reduce((s, t) => s + t.totalPayout, 0);
-  const tripDays = INITIAL_TRIPS.length > 0 ? Math.max(1, Math.ceil((new Date(INITIAL_TRIPS[INITIAL_TRIPS.length - 1].date).getTime() - new Date(INITIAL_TRIPS[0].date).getTime()) / 86400000) + 1) : 30;
+  // === RECURRING MONTHLY BUSINESS EXPENSES (Feb, Mar, Apr 2026 — from PDF) ===
+  // Per-month revenue for dispatch calc
+  const febTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-02-01' && t.date < '2026-03-01');
+  const marTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-02-27' && t.date < '2026-03-21'); // load 8 picked up 2/27 delivered 3/1
+  const aprTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-03-30' && t.date < '2026-04-28');
+  const febRev = febTrips.reduce((s, t) => s + t.totalPayout, 0);
+  const marRev = marTrips.reduce((s, t) => s + t.totalPayout, 0);
+  const aprRev = aprTrips.reduce((s, t) => s + t.totalPayout, 0);
+
+  // --- FEBRUARY 2026 ---
   exps.push(
     { id: 'ins-feb', date: '2026-02-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2400 },
     { id: 'reg-feb', date: '2026-02-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
-    { id: 'toll-feb', date: '2026-02-01', category: 'Tolls', description: 'Tolls & Scales (monthly avg)', amount: 250 },
-    { id: 'disp-feb', date: '2026-02-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${totalRevenue.toLocaleString()} revenue)`, amount: Math.round(totalRevenue * 0.10 * 100) / 100 },
     { id: 'lock-feb', date: '2026-02-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
     { id: 'trlr-feb', date: '2026-02-01', category: 'Trailer', description: 'Trailer Rental (monthly)', amount: 600 },
-    { id: 'food-feb', date: '2026-02-01', category: 'Food', description: `Road Food (~$20/day × ${tripDays} days)`, amount: tripDays * 20 },
+    { id: 'disp-feb', date: '2026-02-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${febRev.toLocaleString()} Feb revenue)`, amount: Math.round(febRev * 0.10 * 100) / 100 },
+    { id: 'prepass-feb', date: '2026-02-28', category: 'Tolls', description: 'Pre-Pass (Feb)', amount: 277.91 },
+    { id: 'logbook-feb', date: '2026-02-28', category: 'Other', description: 'Log Book (Jan & Feb)', amount: 200 },
+    { id: 'nmperm-feb', date: '2026-02-28', category: 'Permits', description: 'NM Permit', amount: 10 },
+    { id: 'mxperm-feb', date: '2026-02-28', category: 'Permits', description: 'Mexico Permit', amount: 35 },
+    { id: 'sign-feb', date: '2026-02-06', category: 'Other', description: 'Print and Cut truck Sign', amount: 86.59 },
+    { id: 'post-feb', date: '2026-02-06', category: 'Other', description: 'Post office / Presass', amount: 15.70 },
+    { id: 'drins-feb', date: '2026-02-28', category: 'Insurance', description: 'Driver Insurance (Feb)', amount: 55 },
+    { id: 'trlrins-feb', date: '2026-02-28', category: 'Insurance', description: 'Trailer Insurance (Feb)', amount: 105 },
+  );
+
+  // --- MARCH 2026 ---
+  exps.push(
+    { id: 'ins-mar', date: '2026-03-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2400 },
+    { id: 'reg-mar', date: '2026-03-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
+    { id: 'lock-mar', date: '2026-03-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
+    { id: 'trlr-mar-feb', date: '2026-03-15', category: 'Trailer', description: 'Trailer Rent (Feb month)', amount: 600 },
+    { id: 'trlr-mar', date: '2026-03-31', category: 'Trailer', description: 'Trailer Rent (Mar month)', amount: 600 },
+    { id: 'disp-mar', date: '2026-03-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${marRev.toLocaleString()} Mar revenue)`, amount: Math.round(marRev * 0.10 * 100) / 100 },
+    { id: 'prepass-mar', date: '2026-03-31', category: 'Tolls', description: 'Pre-Pass (Mar)', amount: 258.17 },
+    { id: 'logbook-mar', date: '2026-03-01', category: 'Other', description: 'Log Book (Mar)', amount: 175.10 },
+    { id: 'insdown-mar', date: '2026-03-31', category: 'Insurance', description: 'Insurance Down Payment', amount: 4900 },
+  );
+
+  // --- APRIL 2026 ---
+  exps.push(
+    { id: 'ins-apr', date: '2026-04-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2065 },
+    { id: 'reg-apr', date: '2026-04-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
+    { id: 'lock-apr', date: '2026-04-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
+    { id: 'trlr-apr', date: '2026-04-01', category: 'Trailer', description: 'Trailer Rental (monthly)', amount: 600 },
+    { id: 'disp-apr', date: '2026-04-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${aprRev.toLocaleString()} Apr revenue)`, amount: Math.round(aprRev * 0.10 * 100) / 100 },
+    { id: 'prepass-apr', date: '2026-04-30', category: 'Tolls', description: 'Pre-Pass (Apr)', amount: 158.19 },
+    { id: 'logbook-apr', date: '2026-04-30', category: 'Other', description: 'Log Book (Apr)', amount: 175.10 },
+    { id: 'tvc-apr', date: '2026-04-30', category: 'Permits', description: 'TVC (Apr)', amount: 35 },
+    { id: 'trksvc-apr', date: '2026-04-30', category: 'Maintenance', description: 'Truck Services (Apr)', amount: 807.30 },
   );
 
   return exps;
@@ -501,7 +729,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 6;
+const DATA_VERSION = 7;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
@@ -512,6 +740,7 @@ const loadState = <T,>(key: string, fallback: T): T => {
       localStorage.removeItem('rl_personal');
       localStorage.removeItem('rl_debts');
       localStorage.setItem('rl_version', String(DATA_VERSION));
+      localStorage.setItem('rl_version_bumped', 'true');
       return fallback;
     }
     const s = localStorage.getItem(key);
@@ -568,6 +797,22 @@ function App() {
   useEffect(() => {
     if (hasPulledRef.current) return;
     hasPulledRef.current = true;
+
+    // If we just bumped DATA_VERSION, skip cloud pull — push new defaults instead
+    const versionBumped = localStorage.getItem('rl_version_bumped') === 'true';
+    if (versionBumped) {
+      localStorage.removeItem('rl_version_bumped');
+      setSyncStatus('syncing');
+      fetch(`${SYNC_API}/sync`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': SYNC_KEY },
+        body: JSON.stringify({ incomes, expenses, personalExpenses, debts }),
+      })
+        .then(r => r.ok ? setSyncStatus('synced') : setSyncStatus('error'))
+        .catch(() => setSyncStatus('error'));
+      return;
+    }
+
     setSyncStatus('syncing');
     fetch(`${SYNC_API}/sync`, { headers: { 'X-API-Key': SYNC_KEY } })
       .then(r => r.json())
@@ -981,46 +1226,46 @@ function App() {
                   {/* Per-mile economics strip — all from centralized mc */}
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.35rem', marginBottom: '0.4rem', fontSize: '0.65rem' }}>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
-                            <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Rate</div>
-                            <div style={{ fontWeight: 800, color: 'var(--success)' }}>${mc.ratePerMile.toFixed(2)}/mi</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
-                            <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Variable</div>
-                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.varPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>fuel+dh+disp+tolls+depr+maint</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center', border: '1px solid rgba(234,179,8,0.25)' }}>
-                            <div style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Fixed/Mi ↓</div>
-                            <div style={{ fontWeight: 800, color: '#eab308' }}>-${mc.fixedPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>{formatCurrency(mc.fixedTotal)}/mo</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
-                            <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>All-In</div>
-                            <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.allInPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>var + fixed spread</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
-                            <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Marginal</div>
-                            <div style={{ fontWeight: 800, color: '#10b981' }}>${mc.marginalPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>next mile earns</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
-                            <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>True Net/Mi</div>
-                            <div style={{ fontWeight: 800, color: mc.netPerMile >= 0 ? 'var(--success)' : 'var(--danger)' }}>${mc.netPerMile.toFixed(2)}/mi</div>
-                            <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>avg all costs</div>
-                          </div>
-                        </div>
-                        {/* Fixed cost dilution */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', padding: '0.35rem 0.6rem', background: 'rgba(234,179,8,0.06)', borderRadius: '6px', border: '1px solid rgba(234,179,8,0.15)', fontSize: '0.55rem', color: '#eab308' }}>
-                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>📉 Fixed dilution:</span>
-                          <span className="text-secondary" style={{ fontSize: '0.5rem' }}>
-                            {formatCurrency(mc.fixedTotal)}/mo ({formatCurrency(mc.fixedTotal * 12)}/yr) →
-                            {monthMiles > 0 ? ` @ ${monthMiles.toLocaleString()} mi = $${mc.fixedPerMile.toFixed(2)}/mi` : ' drive more to dilute'}
-                            {monthMiles > 0 && ` · @ 15k mi = $${(mc.fixedTotal / 15000).toFixed(2)}/mi · @ 20k mi = $${(mc.fixedTotal / 20000).toFixed(2)}/mi`}
-                          </span>
-                        </div>
-                      </>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                        <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Rate</div>
+                        <div style={{ fontWeight: 800, color: 'var(--success)' }}>${mc.ratePerMile.toFixed(2)}/mi</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                        <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Variable</div>
+                        <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.varPerMile.toFixed(2)}/mi</div>
+                        <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>fuel+dh+disp+tolls+depr+maint</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center', border: '1px solid rgba(234,179,8,0.25)' }}>
+                        <div style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700, color: '#eab308' }}>Fixed/Mi ↓</div>
+                        <div style={{ fontWeight: 800, color: '#eab308' }}>-${mc.fixedPerMile.toFixed(2)}/mi</div>
+                        <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>{formatCurrency(mc.fixedTotal)}/mo</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                        <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>All-In</div>
+                        <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-${mc.allInPerMile.toFixed(2)}/mi</div>
+                        <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>var + fixed spread</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                        <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>Marginal</div>
+                        <div style={{ fontWeight: 800, color: '#10b981' }}>${mc.marginalPerMile.toFixed(2)}/mi</div>
+                        <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>next mile earns</div>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                        <div className="text-secondary" style={{ fontSize: '0.45rem', textTransform: 'uppercase', fontWeight: 700 }}>True Net/Mi</div>
+                        <div style={{ fontWeight: 800, color: mc.netPerMile >= 0 ? 'var(--success)' : 'var(--danger)' }}>${mc.netPerMile.toFixed(2)}/mi</div>
+                        <div className="text-secondary" style={{ fontSize: '0.4rem', marginTop: '0.1rem' }}>avg all costs</div>
+                      </div>
+                    </div>
+                    {/* Fixed cost dilution */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', padding: '0.35rem 0.6rem', background: 'rgba(234,179,8,0.06)', borderRadius: '6px', border: '1px solid rgba(234,179,8,0.15)', fontSize: '0.55rem', color: '#eab308' }}>
+                      <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>📉 Fixed dilution:</span>
+                      <span className="text-secondary" style={{ fontSize: '0.5rem' }}>
+                        {formatCurrency(mc.fixedTotal)}/mo ({formatCurrency(mc.fixedTotal * 12)}/yr) →
+                        {monthMiles > 0 ? ` @ ${monthMiles.toLocaleString()} mi = $${mc.fixedPerMile.toFixed(2)}/mi` : ' drive more to dilute'}
+                        {monthMiles > 0 && ` · @ 15k mi = $${(mc.fixedTotal / 15000).toFixed(2)}/mi · @ 20k mi = $${(mc.fixedTotal / 20000).toFixed(2)}/mi`}
+                      </span>
+                    </div>
+                  </>
 
                   {/* Progress toward personal + debt */}
                   <div style={{ marginBottom: '0.5rem' }}>
@@ -1330,17 +1575,17 @@ function App() {
                 { label: '🔧 Maintenance', mVal: mMaint, yVal: yMaint, type: 'variable' },
               ].filter(t => t.mVal > 0 || t.yVal > 0);
               return (
-              <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
-                {tiles.map((e, i) => (
-                  <div key={i} style={{ background: 'rgba(0,0,0,0.2)', border: `1px solid ${e.type === 'fixed' ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.2)'}`, borderRadius: '8px', padding: '0.5rem 0.6rem', fontSize: '0.7rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{e.label}</span>
-                      <span style={{ fontWeight: 700, color: e.type === 'fixed' ? 'var(--danger)' : '#f97316', fontSize: '0.75rem' }}>{formatCurrency(e.mVal)}</span>
+                <div className="grid-expense-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                  {tiles.map((e, i) => (
+                    <div key={i} style={{ background: 'rgba(0,0,0,0.2)', border: `1px solid ${e.type === 'fixed' ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.2)'}`, borderRadius: '8px', padding: '0.5rem 0.6rem', fontSize: '0.7rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{e.label}</span>
+                        <span style={{ fontWeight: 700, color: e.type === 'fixed' ? 'var(--danger)' : '#f97316', fontSize: '0.75rem' }}>{formatCurrency(e.mVal)}</span>
+                      </div>
+                      <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', marginTop: '0.15rem', textAlign: 'right' }}>YTD: {formatCurrency(e.yVal)}</div>
                     </div>
-                    <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', marginTop: '0.15rem', textAlign: 'right' }}>YTD: {formatCurrency(e.yVal)}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               );
             })()}
 
@@ -2056,75 +2301,75 @@ function App() {
                 const projAnnualNet = projAnnualRev - projAnnualVarCost - projAnnualFixedCost;
 
                 return (
-                <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #8b5cf6' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🔮 {bi('Forecast & Sensitivity')}</h3>
+                  <div className="glass-panel" style={{ padding: '1.25rem', marginTop: '1.5rem', borderLeft: '3px solid #8b5cf6' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🔮 {bi('Forecast & Sensitivity')}</h3>
 
-                  {/* Diesel Price Sensitivity */}
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>⛽ If Diesel Prices Change</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                      {dieselScenarios.map((s, i) => {
-                        const newFuelPerMi = baseFuelPerMi + s.change;
-                        const newDHperMi = completedIncomes.length > 0 ? (completedIncomes.length * 40 * newFuelPerMi) / totalMiles : 0;
-                        const newVarPerMi = newFuelPerMi + baseDispatch + newDHperMi + baseTollsPerMi + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
-                        const monthlyImpact = (newVarPerMi - baseVarPerMi) * avgMilesPerMonth;
-                        const newNetPerMi = baseRatePerMi - newVarPerMi;
-                        return (
-                          <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
-                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Fuel: ${newFuelPerMi.toFixed(2)}/mi</div>
-                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
-                            {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>+{formatCurrency(monthlyImpact)}/mo</div>}
+                    {/* Diesel Price Sensitivity */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>⛽ If Diesel Prices Change</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        {dieselScenarios.map((s, i) => {
+                          const newFuelPerMi = baseFuelPerMi + s.change;
+                          const newDHperMi = completedIncomes.length > 0 ? (completedIncomes.length * 40 * newFuelPerMi) / totalMiles : 0;
+                          const newVarPerMi = newFuelPerMi + baseDispatch + newDHperMi + baseTollsPerMi + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                          const monthlyImpact = (newVarPerMi - baseVarPerMi) * avgMilesPerMonth;
+                          const newNetPerMi = baseRatePerMi - newVarPerMi;
+                          return (
+                            <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Fuel: ${newFuelPerMi.toFixed(2)}/mi</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
+                              {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>+{formatCurrency(monthlyImpact)}/mo</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Rate Sensitivity */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📉 If Freight Rates Drop</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        {rateScenarios.map((s, i) => {
+                          const newRate = baseRatePerMi + s.change;
+                          const newDispatch = newRate * 0.10;
+                          const newTolls = newRate * 0.005;
+                          const newVarPerMi = baseFuelPerMi + newDispatch + baseDHperMi + newTolls + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
+                          const newNetPerMi = newRate - newVarPerMi;
+                          const monthlyRevLoss = s.change * avgMilesPerMonth;
+                          return (
+                            <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Rate: ${newRate.toFixed(2)}/mi</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
+                              {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>{formatCurrency(monthlyRevLoss)}/mo rev</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Annual Projection */}
+                    <div>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📅 Projected Annual (based on {monthsActive} month{monthsActive > 1 ? 's' : ''} data)</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                        {[
+                          { label: 'Annual Miles', value: projAnnualMiles.toLocaleString(), color: 'var(--text-primary)' },
+                          { label: 'Gross Revenue', value: formatCurrency(projAnnualRev), color: 'var(--success)' },
+                          { label: 'Total Costs', value: formatCurrency(projAnnualVarCost + projAnnualFixedCost), color: 'var(--danger)' },
+                          { label: 'Net Profit', value: formatCurrency(projAnnualNet), color: projAnnualNet > 0 ? 'var(--success)' : 'var(--danger)' },
+                        ].map((item, i) => (
+                          <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.2rem' }}>{item.label}</div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: item.color }}>{item.value}</div>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                        Based on {avgMilesPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} mi/mo avg · {avgTripsPerMonth.toFixed(1)} trips/mo · ${baseRatePerMi.toFixed(2)}/mi rate
+                      </div>
                     </div>
                   </div>
-
-                  {/* Rate Sensitivity */}
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📉 If Freight Rates Drop</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                      {rateScenarios.map((s, i) => {
-                        const newRate = baseRatePerMi + s.change;
-                        const newDispatch = newRate * 0.10;
-                        const newTolls = newRate * 0.005;
-                        const newVarPerMi = baseFuelPerMi + newDispatch + baseDHperMi + newTolls + CASCADIA_DEPR_RATE + CASCADIA_MAINT_RESERVE;
-                        const newNetPerMi = newRate - newVarPerMi;
-                        const monthlyRevLoss = s.change * avgMilesPerMonth;
-                        return (
-                          <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.3)' : 'var(--border)'}` }}>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: s.color, marginBottom: '0.3rem' }}>{s.label}</div>
-                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Rate: ${newRate.toFixed(2)}/mi</div>
-                            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Net/mi: <span style={{ color: newNetPerMi > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>${newNetPerMi.toFixed(3)}</span></div>
-                            {i > 0 && <div style={{ fontSize: '0.6rem', color: 'var(--danger)', fontWeight: 700 }}>{formatCurrency(monthlyRevLoss)}/mo rev</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Annual Projection */}
-                  <div>
-                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>📅 Projected Annual (based on {monthsActive} month{monthsActive > 1 ? 's' : ''} data)</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                      {[
-                        { label: 'Annual Miles', value: projAnnualMiles.toLocaleString(), color: 'var(--text-primary)' },
-                        { label: 'Gross Revenue', value: formatCurrency(projAnnualRev), color: 'var(--success)' },
-                        { label: 'Total Costs', value: formatCurrency(projAnnualVarCost + projAnnualFixedCost), color: 'var(--danger)' },
-                        { label: 'Net Profit', value: formatCurrency(projAnnualNet), color: projAnnualNet > 0 ? 'var(--success)' : 'var(--danger)' },
-                      ].map((item, i) => (
-                        <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.55rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.2rem' }}>{item.label}</div>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: item.color }}>{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.4rem', fontStyle: 'italic' }}>
-                      Based on {avgMilesPerMonth.toLocaleString(undefined, {maximumFractionDigits: 0})} mi/mo avg · {avgTripsPerMonth.toFixed(1)} trips/mo · ${baseRatePerMi.toFixed(2)}/mi rate
-                    </div>
-                  </div>
-                </div>
                 );
               })()}
 
