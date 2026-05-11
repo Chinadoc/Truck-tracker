@@ -521,7 +521,7 @@ const INITIAL_TRIPS: Income[] = [
   },
   // === MARCH 2026 LOADS (from PDF) ===
   {
-    id: 't8', date: '2026-02-27',
+    id: 't8', date: '2026-03-01',
     loadId: 'PA-TX-008', broker: 'MODE',
     distance: 1600, ratePerMile: 2800 / 1600, totalPayout: 2800,
     originCity: 'Trenton, NJ 08601', destCity: 'Houston, TX 77001',
@@ -603,7 +603,7 @@ const INITIAL_TRIPS: Income[] = [
   },
   // === APRIL 2026 LOADS (from PDF) ===
   {
-    id: 't17', date: '2026-03-30',
+    id: 't17', date: '2026-04-01',
     loadId: 'TX-UT-017', broker: 'Mid America',
     distance: 1300, ratePerMile: 3450 / 1300, totalPayout: 3450,
     originCity: 'Houston, TX 77001', destCity: 'Salt Lake City, UT 84101',
@@ -612,7 +612,7 @@ const INITIAL_TRIPS: Income[] = [
     departureTime: '2026-03-30T04:00', arrivalTime: '2026-04-01T14:00',
   },
   {
-    id: 't18', date: '2026-03-31',
+    id: 't18', date: '2026-04-02',
     loadId: 'UT-CA-018', broker: 'TQL',
     distance: 680, ratePerMile: 1821.73 / 680, totalPayout: 1821.73,
     originCity: 'Salt Lake City, UT 84101', destCity: 'Los Angeles, CA 90001',
@@ -733,56 +733,44 @@ const buildExpenses = (): Expense[] => {
     }
   });
 
-  // === RECURRING MONTHLY BUSINESS EXPENSES (Feb, Mar, Apr 2026 — from PDF) ===
-  // Per-month revenue for dispatch calc
-  const febTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-02-01' && t.date < '2026-03-01');
-  const marTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-02-27' && t.date < '2026-03-21'); // load 8 picked up 2/27 delivered 3/1
-  const aprTrips = INITIAL_TRIPS.filter(t => t.date >= '2026-03-30' && t.date < '2026-04-28');
-  const febRev = febTrips.reduce((s, t) => s + t.totalPayout, 0);
-  const marRev = marTrips.reduce((s, t) => s + t.totalPayout, 0);
-  const aprRev = aprTrips.reduce((s, t) => s + t.totalPayout, 0);
+  // === RECURRING MONTHLY BUSINESS EXPENSES — EXACT PDF AMOUNTS ===
+  // Revenue per month (matching PDF income periods):
+  // Feb: t1-t7 = $16,749, Mar: t8-t16 = $19,270, Apr: t17-t27 = $35,196.73
 
-  // --- FEBRUARY 2026 ---
+  // --- FEBRUARY 2026 --- (PDF Total Expenses: $12,541.21, Net: $4,207.79)
   exps.push(
-    { id: 'ins-feb', date: '2026-02-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2400 },
-    { id: 'reg-feb', date: '2026-02-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
-    { id: 'lock-feb', date: '2026-02-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
-    { id: 'trlr-feb', date: '2026-02-01', category: 'Trailer', description: 'Trailer Rental (monthly)', amount: 600 },
-    { id: 'disp-feb', date: '2026-02-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${febRev.toLocaleString()} Feb revenue)`, amount: Math.round(febRev * 0.10 * 100) / 100 },
-    { id: 'prepass-feb', date: '2026-02-28', category: 'Tolls', description: 'Pre-Pass (Feb)', amount: 277.91 },
+    { id: 'inspmt-feb', date: '2026-02-28', category: 'Insurance', description: 'Insurance Payment (Feb & March)', amount: 3575.25 },
+    { id: 'trlrins-feb', date: '2026-02-28', category: 'Insurance', description: 'Trailer Insurance', amount: 105 },
+    { id: 'drins-feb', date: '2026-02-28', category: 'Insurance', description: 'Driver Insurance', amount: 55 },
+    { id: 'trlr-feb', date: '2026-02-28', category: 'Trailer', description: 'Trailer Expense', amount: 900 },
+    { id: 'disp-feb', date: '2026-02-28', category: 'Dispatch', description: 'Dispatch Fee (10% of $16,749)', amount: 1674.90 },
+    { id: 'prepass-feb', date: '2026-02-28', category: 'Tolls', description: 'Pre-Pass / TVC (Feb)', amount: 277.91 },
     { id: 'logbook-feb', date: '2026-02-28', category: 'Other', description: 'Log Book (Jan & Feb)', amount: 200 },
     { id: 'nmperm-feb', date: '2026-02-28', category: 'Permits', description: 'NM Permit', amount: 10 },
     { id: 'mxperm-feb', date: '2026-02-28', category: 'Permits', description: 'Mexico Permit', amount: 35 },
     { id: 'sign-feb', date: '2026-02-06', category: 'Other', description: 'Print and Cut truck Sign', amount: 86.59 },
-    { id: 'post-feb', date: '2026-02-06', category: 'Other', description: 'Post office / Presass', amount: 15.70 },
-    { id: 'drins-feb', date: '2026-02-28', category: 'Insurance', description: 'Driver Insurance (Feb)', amount: 55 },
-    { id: 'trlrins-feb', date: '2026-02-28', category: 'Insurance', description: 'Trailer Insurance (Feb)', amount: 105 },
+    { id: 'post-feb', date: '2026-02-06', category: 'Other', description: 'Post office Presass', amount: 15.70 },
   );
 
-  // --- MARCH 2026 ---
+  // --- MARCH 2026 --- (PDF Total Expenses: $14,080.56, Net: $5,189.44)
   exps.push(
-    { id: 'ins-mar', date: '2026-03-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2400 },
-    { id: 'reg-mar', date: '2026-03-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
-    { id: 'lock-mar', date: '2026-03-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
-    { id: 'trlr-mar-feb', date: '2026-03-15', category: 'Trailer', description: 'Trailer Rent (Feb month)', amount: 600 },
-    { id: 'trlr-mar', date: '2026-03-31', category: 'Trailer', description: 'Trailer Rent (Mar month)', amount: 600 },
-    { id: 'disp-mar', date: '2026-03-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${marRev.toLocaleString()} Mar revenue)`, amount: Math.round(marRev * 0.10 * 100) / 100 },
-    { id: 'prepass-mar', date: '2026-03-31', category: 'Tolls', description: 'Pre-Pass (Mar)', amount: 258.17 },
     { id: 'logbook-mar', date: '2026-03-01', category: 'Other', description: 'Log Book (Mar)', amount: 175.10 },
+    { id: 'trlr-mar-feb', date: '2026-03-15', category: 'Trailer', description: 'Trailer Rent (Feb month @600)', amount: 600 },
+    { id: 'trlr-mar', date: '2026-03-31', category: 'Trailer', description: 'Trailer Rent (March)', amount: 600 },
+    { id: 'prepass-mar', date: '2026-03-31', category: 'Tolls', description: 'Pre-Pass (Mar)', amount: 258.17 },
     { id: 'insdown-mar', date: '2026-03-31', category: 'Insurance', description: 'Insurance Down Payment', amount: 4900 },
+    { id: 'disp-mar', date: '2026-03-31', category: 'Dispatch', description: 'Dispatch Fee (10% of $19,270)', amount: 1927.00 },
   );
 
-  // --- APRIL 2026 ---
+  // --- APRIL 2026 --- (PDF Total Expenses: $18,721.95, Net: $16,474.78)
   exps.push(
-    { id: 'ins-apr', date: '2026-04-01', category: 'Insurance', description: 'Truck Insurance (monthly)', amount: 2065 },
-    { id: 'reg-apr', date: '2026-04-01', category: 'Registration', description: 'Truck Registration ($1,600/yr ÷ 12)', amount: Math.round(1600 / 12 * 100) / 100 },
-    { id: 'lock-apr', date: '2026-04-01', category: 'Lock Box', description: 'Lock Box (monthly)', amount: 100 },
-    { id: 'trlr-apr', date: '2026-04-01', category: 'Trailer', description: 'Trailer Rental (monthly)', amount: 600 },
-    { id: 'disp-apr', date: '2026-04-01', category: 'Dispatch', description: `Dispatch Fee (10% of $${aprRev.toLocaleString()} Apr revenue)`, amount: Math.round(aprRev * 0.10 * 100) / 100 },
-    { id: 'prepass-apr', date: '2026-04-30', category: 'Tolls', description: 'Pre-Pass (Apr)', amount: 158.19 },
+    { id: 'ins-apr', date: '2026-04-01', category: 'Insurance', description: 'Insurance (monthly)', amount: 2065 },
+    { id: 'trlr-apr', date: '2026-04-01', category: 'Trailer', description: 'Trailer Rent', amount: 600 },
     { id: 'logbook-apr', date: '2026-04-30', category: 'Other', description: 'Log Book (Apr)', amount: 175.10 },
-    { id: 'tvc-apr', date: '2026-04-30', category: 'Permits', description: 'TVC (Apr)', amount: 35 },
-    { id: 'trksvc-apr', date: '2026-04-30', category: 'Maintenance', description: 'Truck Services (Apr)', amount: 807.30 },
+    { id: 'tvc-apr', date: '2026-04-30', category: 'Permits', description: 'TVC', amount: 35 },
+    { id: 'trksvc-apr', date: '2026-04-30', category: 'Maintenance', description: 'Truck Services', amount: 807.30 },
+    { id: 'prepass-apr', date: '2026-04-30', category: 'Tolls', description: 'Pre-Pass (Apr)', amount: 158.19 },
+    { id: 'disp-apr', date: '2026-04-30', category: 'Dispatch', description: 'Dispatch Fee (10% of $35,196.73)', amount: 3519.67 },
   );
 
   return exps;
@@ -792,7 +780,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 9;
+const DATA_VERSION = 10;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
@@ -933,7 +921,7 @@ function App() {
   // ★ CENTRALIZED MONTHLY COST ANALYSIS — single source of truth for all dashboard sections
   const mc = useMemo(() => {
     // Fixed cost categories — pulled from actual expense records (not hardcoded)
-    const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food']);
+    const fixedCats = new Set(['Insurance', 'Trailer', 'Food']);
     const numTrips = monthIncomes.length;
     const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
 
@@ -1502,7 +1490,7 @@ function App() {
               const afterPersonal = afterTax - personalCosts;
               const debtPayment = personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0;
               const buckets = [
-                { label: <>🏢 {bi('Fixed Costs')}</>, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer · Lock Box · Registration', delay: '0s' },
+                { label: <>🏢 {bi('Fixed Costs')}</>, amount: fixedExpenses, filled: Math.min(monthIncome, fixedExpenses), color: '#ef4444', details: 'Insurance · Trailer', delay: '0s' },
                 { label: <>📊 {bi('Variable Costs')}</>, amount: variableExpenses + reservesCost, filled: Math.max(0, Math.min(afterFixed, variableExpenses + reservesCost)), color: '#f97316', details: 'Fuel · Dispatch · Tolls · Deadhead · Depr · Maint', delay: '0.3s' },
                 { label: <>🏛 {bi('Taxes')}</>, amount: taxCosts, filled: Math.max(0, Math.min(afterVariable, taxCosts)), color: '#a855f7', details: `SE only · CTC covers federal`, delay: '0.6s' },
                 { label: <>🏠 {bi('Personal + Debt')}</>, amount: personalCosts, filled: Math.max(0, Math.min(afterTax, personalCosts)), color: '#eab308', details: `Housing · Food · ${formatCurrency(debtPayment)} debt included`, delay: '0.9s' },
@@ -1637,10 +1625,6 @@ function App() {
               const yDepr = totalMiles * CASCADIA_DEPR_RATE;
               const yMaint = totalMiles * CASCADIA_MAINT_RESERVE;
               const tiles = [
-                { label: '🛡 Insurance', mVal: mExp('Insurance') || 2400, yVal: yExp('Insurance') || 2400, type: 'fixed' },
-                { label: '🚛 Trailer', mVal: mExp('Trailer') || 600, yVal: yExp('Trailer') || 600, type: 'fixed' },
-                { label: '🔒 Lock Box', mVal: mExp('Lock Box') || 100, yVal: yExp('Lock Box') || 100, type: 'fixed' },
-                { label: '📋 Registration', mVal: mExp('Registration') || 133, yVal: yExp('Registration') || 133, type: 'fixed' },
                 { label: '⛽ Fuel', mVal: mExp('Fuel'), yVal: yExp('Fuel'), type: 'variable' },
                 { label: '📞 Dispatch', mVal: mExp('Dispatch'), yVal: yExp('Dispatch'), type: 'variable' },
                 { label: '🚚 Deadhead', mVal: mExp('Deadhead'), yVal: yExp('Deadhead'), type: 'variable' },
@@ -2001,10 +1985,8 @@ function App() {
             {/* Fixed vs Variable Breakdown */}
             {(() => {
               const fixedItems = [
-                { name: 'Truck Insurance', monthly: 2400, icon: '🛡' },
-                { name: 'Trailer Rental', monthly: 600, icon: '🚛' },
-                { name: 'Registration', monthly: Math.round(1600 / 12 * 100) / 100, icon: '📋' },
-                { name: 'Lock Box', monthly: 100, icon: '🔒' },
+                { name: 'Truck Insurance', monthly: expenses.filter(e => e.category === 'Insurance').reduce((s, e) => s + e.amount, 0) || 2065, icon: '🛡' },
+                { name: 'Trailer Rental', monthly: expenses.filter(e => e.category === 'Trailer').reduce((s, e) => s + e.amount, 0) || 600, icon: '🚛' },
               ];
               const totalFixed = fixedItems.reduce((s, f) => s + f.monthly, 0);
 
