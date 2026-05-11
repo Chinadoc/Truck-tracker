@@ -187,7 +187,10 @@ const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
 
 // Known monthly fixed costs (used for unit economics / break-even calculation base)
 // Ensures lumpy annual payments don't distort monthly metrics
-const MONTHLY_FIXED_COSTS = 2065 + 600; // Monthly Insurance ($2,065) + Trailer Rent ($600) = $2,665
+const INSURANCE_MONTHLY_RATE = 2065;
+const MONTHLY_FIXED_COSTS = INSURANCE_MONTHLY_RATE + 600; // Monthly Insurance ($2,065) + Trailer Rent ($600) = $2,665
+const INSURANCE_PREPAID_IDS = new Set(['insdown-mar', 'inspmt-feb']); // Large insurance payments treated as prepaid deposits
+const INSURANCE_PREPAID_START = '2026-02'; // First month of coverage
 const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
 // === TAX CALCULATION (MFJ, 10 dependent children, self-employed 1099) ===
@@ -929,8 +932,6 @@ function App() {
     const fixedCats = FIXED_CATS;
     // Reserve categories — these are handled via per-mile accrual (reservesTotal) so don't hit operating costs directly
     const reserveCats = new Set(['Maintenance', 'Depreciation']);
-    // One-Off IDs — lump-sum or irregular payments that reduce true net profit, but shouldn't bloat the "Variable Costs" / mi metrics
-    const oneOffIds = new Set(['insdown-mar', 'inspmt-feb']);
     const numTrips = monthIncomes.length;
     const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
 
@@ -940,11 +941,18 @@ function App() {
     const tollsFromRecords = monthExpenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0);
     const deadheadFromRecords = monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
 
-    // Operating Variable Costs
-    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category) && !reserveCats.has(e.category) && !oneOffIds.has(e.id)).reduce((s, e) => s + e.amount, 0);
+    // Operating Variable Costs (exclude prepaid insurance deposits — they are amortized via fixedTotal)
+    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category) && !reserveCats.has(e.category) && !INSURANCE_PREPAID_IDS.has(e.id)).reduce((s, e) => s + e.amount, 0);
 
-    // One-Off Expenses affecting bottom line
-    const oneOffFromRecords = monthExpenses.filter(e => oneOffIds.has(e.id)).reduce((s, e) => s + e.amount, 0);
+    // === PREPAID INSURANCE POOL ===
+    // Large deposits are treated as prepaid credit; each month draws $2,065
+    const totalPrepaid = expenses.filter(e => INSURANCE_PREPAID_IDS.has(e.id)).reduce((s, e) => s + e.amount, 0);
+    const [selY, selM] = selectedMonth.split('-').map(Number);
+    const [startY, startM] = INSURANCE_PREPAID_START.split('-').map(Number);
+    const monthsElapsed = Math.max(0, (selY - startY) * 12 + (selM - startM) + 1);
+    const prepaidConsumed = monthsElapsed * INSURANCE_MONTHLY_RATE;
+    const prepaidRemaining = Math.max(0, totalPrepaid - prepaidConsumed);
+    const monthsOfCreditLeft = Math.max(0, Math.floor(prepaidRemaining / INSURANCE_MONTHLY_RATE));
 
     // Per-mile from actuals
     const fuelPerMile = monthMiles > 0 ? fuelFromRecords / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
@@ -978,8 +986,9 @@ function App() {
     const allInPerMile = varPerMile + fixedPerMile;
     const marginalPerMile = ratePerMile - varPerMile;
 
-    // True net = revenue minus ALL costs (actual records + reserves + one-offs, no double-counting)
-    const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal + oneOffFromRecords;
+    // True net = revenue minus ALL costs (actual records + reserves, no double-counting)
+    // Prepaid insurance deposits are NOT added here — they're amortized into fixedTotal at $2,065/mo
+    const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal;
     const trueNetProfit = monthIncome - totalTrueCosts;
     // Net per mile computed directly from trueNetProfit to guarantee consistency
     const netPerMile = monthMiles > 0 ? trueNetProfit / monthMiles : 0;
@@ -993,7 +1002,8 @@ function App() {
       reservesPerMile, reservesTotal, varPerMile, varTotal,
       fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile, otherVarPerMile,
       totalTrueCosts, trueNetProfit, companyDriverEq, beating,
-      monthVarExp: allVarFromRecords, oneOffFromRecords,
+      monthVarExp: allVarFromRecords,
+      totalPrepaid, prepaidConsumed, prepaidRemaining, monthsOfCreditLeft,
     };
   }, [monthIncomes, monthExpenses, monthIncome, monthMiles]);
 
@@ -1403,11 +1413,43 @@ function App() {
                             const otherFixed = monthExpenses.filter(e => FIXED_CATS.has(e.category) && e.category !== 'Insurance' && e.category !== 'Trailer').reduce((s, e) => s + e.amount, 0);
                             return otherFixed > 0 ? <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Food')}:</span> <span>{formatCurrency(otherFixed)}</span></div> : null;
                           })()}
-                          {mc.oneOffFromRecords > 0 && <>
-                            <div style={{ fontWeight: 700, color: '#f97316', marginTop: '0.5rem', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>One-Off Charges ({formatCurrency(mc.oneOffFromRecords)})</div>
-                            {monthExpenses.filter(e => ['insdown-mar', 'inspmt-feb'].includes(e.id)).map(e => (
-                              <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span style={{ flex: 1 }}>{e.description}:</span> <span>{formatCurrency(e.amount)}</span></div>
-                            ))}
+                          {mc.totalPrepaid > 0 && <>
+                            <div style={{ fontWeight: 700, color: '#f97316', marginTop: '0.5rem', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>🏦 Insurance Prepaid Credit</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>Deposited:</span> <span>{formatCurrency(mc.totalPrepaid)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>Used to date:</span> <span style={{ color: 'var(--danger)' }}>-{formatCurrency(mc.prepaidConsumed)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem', fontWeight: 700 }}><span>Remaining:</span> <span style={{ color: mc.prepaidRemaining > 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mc.prepaidRemaining)}</span></div>
+                            <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.15rem' }}>
+                              <div style={{ width: `${Math.min(100, mc.totalPrepaid > 0 ? (mc.prepaidRemaining / mc.totalPrepaid) * 100 : 0)}%`, height: '100%', borderRadius: '3px', transition: 'width 0.6s ease', background: mc.prepaidRemaining > mc.totalPrepaid * 0.3 ? 'var(--success)' : mc.prepaidRemaining > 0 ? '#eab308' : 'var(--danger)' }} />
+                            </div>
+                            <div className="text-secondary" style={{ fontSize: '0.5rem', textAlign: 'right' }}>{mc.monthsOfCreditLeft > 0 ? `Covers ${mc.monthsOfCreditLeft} more month${mc.monthsOfCreditLeft > 1 ? 's' : ''} @ $${INSURANCE_MONTHLY_RATE}/mo` : 'Credit exhausted — monthly payments cover going forward'}</div>
+                            {/* Annual Insurance Projection */}
+                            {(() => {
+                              const year = selectedMonth.split('-')[0];
+                              const annualPremium = INSURANCE_MONTHLY_RATE * 12; // $24,780
+                              const allInsThisYear = expenses.filter(e => e.date.startsWith(year) && (e.category === 'Insurance' || INSURANCE_PREPAID_IDS.has(e.id)));
+                              const totalPaidThisYear = allInsThisYear.reduce((s, e) => s + e.amount, 0);
+                              const annualRemaining = Math.max(0, annualPremium - totalPaidThisYear);
+                              const pctPaid = annualPremium > 0 ? Math.min(100, (totalPaidThisYear / annualPremium) * 100) : 0;
+                              const monthsLeft = 12 - Number(selectedMonth.split('-')[1]);
+                              return (
+                                <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.5rem', background: 'rgba(99,102,241,0.06)', borderRadius: '6px', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                  <div style={{ fontWeight: 700, fontSize: '0.55rem', color: '#818cf8', marginBottom: '0.2rem' }}>📅 {year} Annual Insurance</div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.5rem', marginBottom: '0.15rem' }}>
+                                    <span>Annual premium:</span> <span>{formatCurrency(annualPremium)}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.5rem', marginBottom: '0.15rem' }}>
+                                    <span>Paid to date ({allInsThisYear.length} payments):</span> <span style={{ color: 'var(--success)' }}>{formatCurrency(totalPaidThisYear)}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.5rem', marginBottom: '0.15rem', fontWeight: 700 }}>
+                                    <span>Still owed ({monthsLeft} mo left):</span> <span style={{ color: annualRemaining > 0 ? '#eab308' : 'var(--success)' }}>{formatCurrency(annualRemaining)}</span>
+                                  </div>
+                                  <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${pctPaid}%`, height: '100%', borderRadius: '3px', transition: 'width 0.6s ease', background: 'linear-gradient(90deg, #818cf8, #6366f1)' }} />
+                                  </div>
+                                  <div className="text-secondary" style={{ fontSize: '0.45rem', textAlign: 'right', marginTop: '0.1rem' }}>{pctPaid.toFixed(0)}% of annual obligation funded</div>
+                                </div>
+                              );
+                            })()}
                           </>}
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dotted rgba(255,255,255,0.1)' }}><span>{bi('Personal Need')}:</span> <span>{formatCurrency(totalPersonalMonthly)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Debt Payment')}:</span> <span>{formatCurrency(personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0)}</span></div>
