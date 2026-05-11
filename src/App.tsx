@@ -984,7 +984,7 @@ function App() {
       dispatchPerMile, dispatchTotal, deadheadPerMile, deadheadTotal,
       tollsPerMile, tollsTotal, deprPerMile, maintPerMile,
       reservesPerMile, reservesTotal, varPerMile, varTotal,
-      fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile,
+      fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile, otherVarPerMile,
       totalTrueCosts, trueNetProfit, companyDriverEq, beating,
       monthVarExp: allVarFromRecords,
     };
@@ -1407,13 +1407,14 @@ function App() {
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Calculator size={18} className="text-accent" /> {bi('Where Every Dollar Goes (Per Mile)')}
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
                   {[
                     { label: 'Avg Rate', value: `$${mc.ratePerMile.toFixed(2)}`, color: 'var(--success)', sub: 'per loaded mi' },
-                    { label: 'Fuel+DH', value: `-$${(mc.fuelPerMile + mc.deadheadPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `fuel + 40mi/trip dh` },
+                    { label: 'Fuel+DH', value: `-$${(mc.fuelPerMile + mc.deadheadPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `calibrated actual` },
                     { label: 'Disp+Tolls', value: `-$${(mc.dispatchPerMile + mc.tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: 'actual records' },
                     { label: 'Depr+Maint', value: `-$${mc.reservesPerMile.toFixed(3)}`, color: '#eab308', sub: 'reserves/mi' },
-                    { label: 'TRUE Net/mi', value: `$${mc.marginalPerMile.toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
+                    { label: 'Fixed+Other', value: `-$${(mc.fixedPerMile + mc.otherVarPerMile).toFixed(2)}`, color: '#f97316', sub: 'ins/trlr/permits' },
+                    { label: 'All-In Net', value: `$${mc.netPerMile.toFixed(2)}`, color: 'var(--accent)', sub: 'per loaded mi' },
                   ].map((item, i) => (
                     <div key={i} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{item.label}</div>
