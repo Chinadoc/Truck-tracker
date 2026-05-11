@@ -2107,8 +2107,8 @@ function App() {
             {/* Fixed vs Variable Breakdown */}
             {(() => {
               const fixedItems = [
-                { name: 'Truck Insurance', monthly: expenses.filter(e => e.category === 'Insurance').reduce((s, e) => s + e.amount, 0) || 2065, icon: '🛡' },
-                { name: 'Trailer Rental', monthly: expenses.filter(e => e.category === 'Trailer').reduce((s, e) => s + e.amount, 0) || 600, icon: '🚛' },
+                { name: 'Truck Insurance', monthly: INSURANCE_MONTHLY_RATE, icon: '🛡' },
+                { name: 'Trailer Rental', monthly: 600, icon: '🚛' },
               ];
               const totalFixed = fixedItems.reduce((s, f) => s + f.monthly, 0);
 
@@ -2170,16 +2170,23 @@ function App() {
             })()}
 
             {/* Total Burn Rate Summary */}
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '3px solid var(--danger)' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Total Business Burn Rate</div>
-                <div className="text-secondary" style={{ fontSize: '0.7rem' }}>Fixed monthly + variable this cycle + hidden reserves</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="text-danger" style={{ fontWeight: 800, fontSize: '1.3rem' }}>{formatCurrency(totalExpenses + analysis.totalHiddenCosts)}</div>
-                <div className="text-secondary" style={{ fontSize: '0.65rem' }}>vs {formatCurrency(totalIncome)} revenue = <span style={{ color: totalIncome > totalExpenses + analysis.totalHiddenCosts ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(totalIncome - totalExpenses - analysis.totalHiddenCosts)}</span></div>
-              </div>
-            </div>
+            {(() => {
+              const prepaidTotal = expenses.filter(e => INSURANCE_PREPAID_IDS.has(e.id)).reduce((s, e) => s + e.amount, 0);
+              const operatingExp = totalExpenses - prepaidTotal;
+              const burnRate = operatingExp + analysis.totalHiddenCosts;
+              return (
+                <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '3px solid var(--danger)' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Total Business Burn Rate</div>
+                    <div className="text-secondary" style={{ fontSize: '0.7rem' }}>Fixed monthly + variable this cycle + hidden reserves</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="text-danger" style={{ fontWeight: 800, fontSize: '1.3rem' }}>{formatCurrency(burnRate)}</div>
+                    <div className="text-secondary" style={{ fontSize: '0.65rem' }}>vs {formatCurrency(totalIncome)} revenue = <span style={{ color: totalIncome > burnRate ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{formatCurrency(totalIncome - burnRate)}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem' }}>📋 All Expense Transactions</h3>
             <div className="glass-panel p-0 overflow-hidden">
