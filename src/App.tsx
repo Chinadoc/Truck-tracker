@@ -284,7 +284,7 @@ const MONTHLY_AVG_RATES: Record<string, { rate: number; label: string }> = {
   '11': { rate: 2.70, label: 'Nov' }, '12': { rate: 2.80, label: 'Dec' },
 };
 
-// Regional diesel prices ($/gal, Feb 2026 estimates)
+// Regional diesel prices ($/gal, baseline Feb 2026 estimates)
 const REGIONAL_DIESEL: Record<string, { price: number; label: string }> = {
   'UT': { price: 3.80, label: 'Utah ($3.80/gal)' },
   'TX': { price: 3.40, label: 'Texas ($3.40/gal)' },
@@ -317,7 +317,16 @@ const ROUTE_MIDPOINTS: Record<string, string> = {
   'NC-TX': 'TN',
 };
 
-// Fuel cost — averages origin, midpoint, and destination prices
+// === ACTUAL FUEL CARD DATA (TCS totals from PDF) ===
+// When actual monthly fuel spend is known, we calibrate per-trip estimates
+// to match reality (accounts for price spikes, truckstop markups, DEF, etc.)
+const ACTUAL_MONTHLY_FUEL: Record<string, number> = {
+  '2026-02': 5605.86,   // TCS Feb (PDF)
+  '2026-03': 5620.29,   // TCS Mar (PDF)
+  '2026-04': 11361.69,  // TCS Apr (PDF)
+};
+
+// Fuel cost — averages origin, midpoint, and destination prices (baseline estimate)
 const fuelCostForMiles = (miles: number, originRegion: string, destRegion?: string) => {
   const oPrice = REGIONAL_DIESEL[originRegion]?.price ?? REGIONAL_DIESEL['AVG'].price;
   if (!destRegion) return (miles / MPG) * oPrice;
@@ -327,6 +336,52 @@ const fuelCostForMiles = (miles: number, originRegion: string, destRegion?: stri
   const mPrice = REGIONAL_DIESEL[midRegion]?.price ?? REGIONAL_DIESEL['AVG'].price;
   const avgPrice = (oPrice + mPrice + dPrice) / 3;
   return (miles / MPG) * avgPrice;
+};
+
+// === CALIBRATION ENGINE ===
+// Computes per-month calibration ratios (actual ÷ estimated) and provides
+// a best-guess multiplier for months without actual data.
+const computeFuelCalibration = (trips: typeof INITIAL_TRIPS) => {
+  // Step 1: Group trips by month and compute estimated fuel per month
+  const monthEstimates: Record<string, number> = {};
+  trips.forEach(trip => {
+    const ym = trip.date.substring(0, 7);
+    const est = fuelCostForMiles(trip.distance, trip.fuelRegion ?? 'AVG', trip.destFuelRegion);
+    const dhEst = (trip.deadheadMiles ?? 0) > 0
+      ? fuelCostForMiles(trip.deadheadMiles!, trip.fuelRegion ?? 'AVG')
+      : 0;
+    monthEstimates[ym] = (monthEstimates[ym] ?? 0) + est + dhEst;
+  });
+
+  // Step 2: Compute calibration ratios for months with actual data
+  const ratios: { ym: string; ratio: number }[] = [];
+  for (const [ym, actual] of Object.entries(ACTUAL_MONTHLY_FUEL)) {
+    const estimated = monthEstimates[ym];
+    if (estimated && estimated > 0) {
+      ratios.push({ ym, ratio: actual / estimated });
+    }
+  }
+  ratios.sort((a, b) => b.ym.localeCompare(a.ym)); // most recent first
+
+  // Step 3: For months without actual data, use weighted rolling avg
+  // (recent months weighted more heavily)
+  const getCalibrationRatio = (ym: string): number => {
+    // If we have actual data for this month, use exact ratio
+    const exact = ratios.find(r => r.ym === ym);
+    if (exact) return exact.ratio;
+
+    // Otherwise: weighted average of known ratios (most recent = heaviest)
+    if (ratios.length === 0) return 1.0; // no actuals at all, use raw estimate
+    if (ratios.length === 1) return ratios[0].ratio;
+
+    // Exponential decay: most recent month gets weight 4, next 2, rest 1
+    const weights = [4, 2, ...Array(Math.max(0, ratios.length - 2)).fill(1)];
+    const totalWeight = weights.reduce((s, w) => s + w, 0);
+    const weightedRatio = ratios.reduce((s, r, i) => s + r.ratio * (weights[i] ?? 1), 0) / totalWeight;
+    return weightedRatio;
+  };
+
+  return { ratios, getCalibrationRatio, monthEstimates };
 };
 
 // === TYPES ===
@@ -648,24 +703,32 @@ const INITIAL_TRIPS: Income[] = [
   },
 ];
 
-// Build fuel + deadhead expenses from trip data
+// Build fuel + deadhead expenses from trip data (calibrated against actual TCS fuel card spend)
 const buildExpenses = (): Expense[] => {
   const exps: Expense[] = [];
+  const calibration = computeFuelCalibration(INITIAL_TRIPS);
+
   INITIAL_TRIPS.forEach(trip => {
-    const fuelCost = fuelCostForMiles(trip.distance, trip.fuelRegion ?? 'AVG', trip.destFuelRegion);
+    const rawFuelCost = fuelCostForMiles(trip.distance, trip.fuelRegion ?? 'AVG', trip.destFuelRegion);
+    const ym = trip.date.substring(0, 7);
+    const ratio = calibration.getCalibrationRatio(ym);
+    const calibratedFuel = rawFuelCost * ratio;
     const oLabel = REGIONAL_DIESEL[trip.fuelRegion ?? 'AVG']?.label ?? '';
     const dLabel = trip.destFuelRegion ? REGIONAL_DIESEL[trip.destFuelRegion]?.label ?? '' : '';
+    const hasActual = ym in ACTUAL_MONTHLY_FUEL;
+    const ratioLabel = hasActual ? `×${ratio.toFixed(2)} TCS-calibrated` : `×${ratio.toFixed(2)} est`;
     exps.push({
       id: `fuel-${trip.id}`, date: trip.date, category: 'Fuel',
-      description: `Fuel: ${trip.originCity} → ${trip.destCity} (avg: ${oLabel.split('(')[0]}→ ${dLabel.split('(')[0]})`,
-      amount: Math.round(fuelCost * 100) / 100,
+      description: `Fuel: ${trip.originCity} → ${trip.destCity} (${oLabel.split('(')[0]}→ ${dLabel.split('(')[0]}${ratioLabel})`,
+      amount: Math.round(calibratedFuel * 100) / 100,
     });
     if (trip.deadheadMiles && trip.deadheadMiles > 0) {
-      const dhFuel = fuelCostForMiles(trip.deadheadMiles, trip.fuelRegion ?? 'AVG');
+      const rawDhFuel = fuelCostForMiles(trip.deadheadMiles, trip.fuelRegion ?? 'AVG');
+      const calibratedDh = rawDhFuel * ratio;
       exps.push({
         id: `dh-${trip.id}`, date: trip.date, category: 'Deadhead',
-        description: `Deadhead (empty): ${trip.deadheadFrom} (${trip.deadheadMiles} mi)`,
-        amount: Math.round(dhFuel * 100) / 100,
+        description: `Deadhead (empty): ${trip.deadheadFrom} (${trip.deadheadMiles} mi, ${ratioLabel})`,
+        amount: Math.round(calibratedDh * 100) / 100,
       });
     }
   });
@@ -729,7 +792,7 @@ const INITIAL_EXPENSES: Expense[] = buildExpenses();
 
 // === MAIN APP ===
 // Data versioning — bump this to force-reset cached data when defaults change
-const DATA_VERSION = 7;
+const DATA_VERSION = 9;
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const savedVer = Number(localStorage.getItem('rl_version') || '0');
@@ -869,33 +932,46 @@ function App() {
 
   // ★ CENTRALIZED MONTHLY COST ANALYSIS — single source of truth for all dashboard sections
   const mc = useMemo(() => {
-    const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food', 'Tolls']);
+    // Fixed cost categories — pulled from actual expense records (not hardcoded)
+    const fixedCats = new Set(['Insurance', 'Registration', 'Lock Box', 'Trailer', 'Food']);
     const numTrips = monthIncomes.length;
     const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
+
+    // === ACTUAL EXPENSE RECORD TOTALS (no double-counting) ===
     const fuelFromRecords = monthExpenses.filter(e => e.category === 'Fuel').reduce((s, e) => s + e.amount, 0);
+    const dispatchFromRecords = monthExpenses.filter(e => e.category === 'Dispatch').reduce((s, e) => s + e.amount, 0);
+    const tollsFromRecords = monthExpenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0);
+    const deadheadFromRecords = monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
+    const fixedFromRecords = monthExpenses.filter(e => fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+
+    // Per-mile from actuals
     const fuelPerMile = monthMiles > 0 ? fuelFromRecords / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
-    const dispatchPerMile = ratePerMile * 0.10;
-    const dispatchTotal = monthIncome * 0.10;
-    const deadheadPerMile = monthMiles > 0 ? (numTrips * 40 * fuelPerMile) / monthMiles : 0;
-    const deadheadTotal = numTrips * 40 * fuelPerMile;
-    const tollsPerMile = ratePerMile * 0.005;
-    const tollsTotal = monthIncome * 0.005;
+    const dispatchPerMile = monthMiles > 0 ? dispatchFromRecords / monthMiles : ratePerMile * 0.10;
+    const dispatchTotal = dispatchFromRecords;
+    const deadheadPerMile = monthMiles > 0 ? deadheadFromRecords / monthMiles : 0;
+    const deadheadTotal = deadheadFromRecords;
+    const tollsPerMile = monthMiles > 0 ? tollsFromRecords / monthMiles : 0;
+    const tollsTotal = tollsFromRecords;
+
+    // Hidden reserves (not in expense records — these are long-term cost allocations)
     const deprPerMile = CASCADIA_DEPR_RATE;
     const maintPerMile = CASCADIA_MAINT_RESERVE;
     const reservesPerMile = deprPerMile + maintPerMile;
     const reservesTotal = monthMiles * reservesPerMile;
+
+    // Aggregate per-mile
     const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile;
-    const varTotal = monthMiles * varPerMile; // or: fuelFromRecords + dispatchTotal + deadheadTotal + tollsTotal + reservesTotal
-    const fixedTotal = MONTHLY_FIXED_COSTS;
+    const varTotal = allVarFromRecords + reservesTotal;
+    const fixedTotal = fixedFromRecords > 0 ? fixedFromRecords : MONTHLY_FIXED_COSTS;
     const fixedPerMile = monthMiles > 0 ? fixedTotal / monthMiles : 0;
     const allInPerMile = varPerMile + fixedPerMile;
     const marginalPerMile = ratePerMile - varPerMile;
     const netPerMile = ratePerMile - allInPerMile;
-    // Use only non-fixed expense records for variable (avoid double-counting with MONTHLY_FIXED_COSTS)
-    const monthVarExp = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
-    // KPI true costs = fixed + actual variable records + reserves + estimates (DH, tolls, dispatch)
-    // but actual records already include fuel+dispatch records, so use per-mile formula for consistency
-    const trueNetProfit = monthIncome - fixedTotal - monthVarExp - reservesTotal - deadheadTotal - tollsTotal - dispatchTotal;
+
+    // True net = revenue minus ALL costs (actual records + reserves, no double-counting)
+    const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal;
+    const trueNetProfit = monthIncome - totalTrueCosts;
     const companyDriverEq = monthMiles * COMPANY_DRIVER_RATE;
     const beating = trueNetProfit > companyDriverEq;
     return {
@@ -904,8 +980,8 @@ function App() {
       tollsPerMile, tollsTotal, deprPerMile, maintPerMile,
       reservesPerMile, reservesTotal, varPerMile, varTotal,
       fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile,
-      totalTrueCosts: fixedTotal + monthVarExp + reservesTotal + deadheadTotal + tollsTotal + dispatchTotal,
-      trueNetProfit, companyDriverEq, beating, monthVarExp,
+      totalTrueCosts, trueNetProfit, companyDriverEq, beating,
+      monthVarExp: allVarFromRecords,
     };
   }, [monthIncomes, monthExpenses, monthIncome, monthMiles]);
 
@@ -1056,7 +1132,7 @@ function App() {
   };
 
   // Per-trip cost detail
-  const getTripExpenses = (tripId: string) => expenses.filter(e => e.id.includes(tripId));
+  const getTripExpenses = (tripId: string) => expenses.filter(e => e.id.endsWith(`-${tripId}`));
 
   // Duration helper
   const getTripDuration = (dep?: string, arr?: string) => {
@@ -1330,7 +1406,7 @@ function App() {
                   {[
                     { label: 'Avg Rate', value: `$${mc.ratePerMile.toFixed(2)}`, color: 'var(--success)', sub: 'per loaded mi' },
                     { label: 'Fuel+DH', value: `-$${(mc.fuelPerMile + mc.deadheadPerMile).toFixed(2)}`, color: 'var(--danger)', sub: `fuel + 40mi/trip dh` },
-                    { label: 'Disp+Tolls', value: `-$${(mc.dispatchPerMile + mc.tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: '10% + 0.5% of rev' },
+                    { label: 'Disp+Tolls', value: `-$${(mc.dispatchPerMile + mc.tollsPerMile).toFixed(2)}`, color: 'var(--danger)', sub: 'actual records' },
                     { label: 'Depr+Maint', value: `-$${mc.reservesPerMile.toFixed(3)}`, color: '#eab308', sub: 'reserves/mi' },
                     { label: 'TRUE Net/mi', value: `$${mc.marginalPerMile.toFixed(3)}`, color: 'var(--accent)', sub: 'per loaded mi' },
                   ].map((item, i) => (
@@ -1348,8 +1424,8 @@ function App() {
                 <>
                   {[
                     { name: 'Diesel & DEF', amount: mc.fuelFromRecords, color: 'var(--danger)' },
-                    { name: 'Deadhead Est (40mi/trip)', amount: mc.deadheadTotal, color: '#f97316' },
-                    { name: 'Tolls Est (0.5% rev)', amount: mc.tollsTotal, color: '#f97316' },
+                    { name: 'Deadhead (actual)', amount: mc.deadheadTotal, color: '#f97316' },
+                    { name: 'Tolls / Pre-Pass', amount: mc.tollsTotal, color: '#f97316' },
                     { name: 'Truck Depreciation Reserve', amount: monthMiles * mc.deprPerMile, color: 'var(--danger)' },
                     { name: 'Maintenance & Tires Reserve', amount: monthMiles * mc.maintPerMile, color: '#eab308' },
                   ].map((b, i) => {
@@ -1568,9 +1644,9 @@ function App() {
                 { label: '🔒 Lock Box', mVal: mExp('Lock Box') || 100, yVal: yExp('Lock Box') || 100, type: 'fixed' },
                 { label: '📋 Registration', mVal: mExp('Registration') || 133, yVal: yExp('Registration') || 133, type: 'fixed' },
                 { label: '⛽ Fuel', mVal: mExp('Fuel'), yVal: yExp('Fuel'), type: 'variable' },
-                { label: '📞 Dispatch 10%', mVal: monthIncome * 0.10, yVal: totalIncome * 0.10, type: 'variable' },
-                { label: '🚚 Deadhead Est', mVal: monthIncomes.length * 40 * (monthMiles > 0 ? mExp('Fuel') / monthMiles : 0), yVal: completedIncomes.length * 40 * (totalMiles > 0 ? yExp('Fuel') / totalMiles : 0), type: 'variable' },
-                { label: '🛣 Tolls Est (0.5%)', mVal: monthIncome * 0.005, yVal: totalIncome * 0.005, type: 'variable' },
+                { label: '📞 Dispatch', mVal: mExp('Dispatch'), yVal: yExp('Dispatch'), type: 'variable' },
+                { label: '🚚 Deadhead', mVal: mExp('Deadhead'), yVal: yExp('Deadhead'), type: 'variable' },
+                { label: '🛣 Tolls / Pre-Pass', mVal: mExp('Tolls'), yVal: yExp('Tolls'), type: 'variable' },
                 { label: '📉 Depreciation', mVal: mDepr, yVal: yDepr, type: 'variable' },
                 { label: '🔧 Maintenance', mVal: mMaint, yVal: yMaint, type: 'variable' },
               ].filter(t => t.mVal > 0 || t.yVal > 0);
@@ -1936,9 +2012,9 @@ function App() {
 
               const variableItems = [
                 { name: 'Fuel (Diesel + DEF)', amount: analysis.trackedFuelCost, rate: `$${(analysis.trackedFuelCost / Math.max(1, totalMiles)).toFixed(2)}/mi`, icon: '⛽' },
-                { name: 'Dispatch (10%)', amount: totalIncome * 0.10, rate: '10% of revenue', icon: '📞' },
-                { name: 'Tolls Est (0.5%)', amount: totalIncome * 0.005, rate: '0.5% of revenue', icon: '🛣' },
-                { name: 'Deadhead Est (40mi/trip)', amount: completedIncomes.length * 40 * (totalMiles > 0 ? analysis.trackedFuelCost / totalMiles : 0), rate: '40mi/trip at fuel rate', icon: '🚚' },
+                { name: 'Dispatch', amount: expenses.filter(e => e.category === 'Dispatch').reduce((s, e) => s + e.amount, 0), rate: 'actual records', icon: '📞' },
+                { name: 'Tolls / Pre-Pass', amount: expenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0), rate: 'actual records', icon: '🛣' },
+                { name: 'Deadhead', amount: expenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0), rate: 'actual records', icon: '🚚' },
                 { name: 'Depreciation Reserve', amount: analysis.vehicleDepreciation, rate: `$${CASCADIA_DEPR_RATE.toFixed(3)}/mi`, icon: '📉' },
                 { name: 'Maintenance Reserve', amount: analysis.maintReserve, rate: `$${CASCADIA_MAINT_RESERVE.toFixed(2)}/mi`, icon: '🔧' },
               ];
