@@ -185,8 +185,9 @@ const CASCADIA_DEPR_RATE = VEHICLE_VALUE / THREE_YEAR_MILES;
 const TIRE_SET_COST = 4000;       // 18 tires, full set
 const TIRE_LIFE_MILES = 80000;    // aggressive replacement cycle
 
-// Known monthly fixed costs (used when no expense records exist for current month)
-const MONTHLY_FIXED_COSTS = 2400 + Math.round(1600 / 12) + 100 + 600; // Insurance + Registration + Lock Box + Trailer = $3,233
+// Known monthly fixed costs (used for unit economics / break-even calculation base)
+// Ensures lumpy annual payments don't distort monthly metrics
+const MONTHLY_FIXED_COSTS = 2065 + 600; // Monthly Insurance ($2,065) + Trailer Rent ($600) = $2,665
 const CASCADIA_MAINT_RESERVE = TIRE_SET_COST / TIRE_LIFE_MILES; // $0.05/mi
 const MPG = 7.0; // actual reported MPG
 // === TAX CALCULATION (MFJ, 10 dependent children, self-employed 1099) ===
@@ -928,6 +929,8 @@ function App() {
     const fixedCats = FIXED_CATS;
     // Reserve categories — these are handled via per-mile accrual (reservesTotal) so don't hit operating costs directly
     const reserveCats = new Set(['Maintenance', 'Depreciation']);
+    // One-Off IDs — lump-sum or irregular payments that reduce true net profit, but shouldn't bloat the "Variable Costs" / mi metrics
+    const oneOffIds = new Set(['insdown-mar', 'inspmt-feb']);
     const numTrips = monthIncomes.length;
     const ratePerMile = monthMiles > 0 ? monthIncome / monthMiles : 2.0;
 
@@ -936,7 +939,12 @@ function App() {
     const dispatchFromRecords = monthExpenses.filter(e => e.category === 'Dispatch').reduce((s, e) => s + e.amount, 0);
     const tollsFromRecords = monthExpenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0);
     const deadheadFromRecords = monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
-    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category) && !reserveCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
+
+    // Operating Variable Costs
+    const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category) && !reserveCats.has(e.category) && !oneOffIds.has(e.id)).reduce((s, e) => s + e.amount, 0);
+
+    // One-Off Expenses affecting bottom line
+    const oneOffFromRecords = monthExpenses.filter(e => oneOffIds.has(e.id)).reduce((s, e) => s + e.amount, 0);
 
     // Per-mile from actuals
     const fuelPerMile = monthMiles > 0 ? fuelFromRecords / monthMiles : REGIONAL_DIESEL['AVG'].price / MPG;
@@ -961,19 +969,17 @@ function App() {
     const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile + otherVarPerMile;
     const varTotal = allVarFromRecords + reservesTotal;
 
-    // Fixed costs: average ALL fixed expenses across all months for a smooth monthly rate
-    // This prevents lumpy payments (e.g. $4,900 insurance down payment) from distorting any single month
-    const allFixedExpenses = expenses.filter(e => fixedCats.has(e.category));
-    const totalFixedAllMonths = allFixedExpenses.reduce((s, e) => s + e.amount, 0);
-    const fixedMonths = new Set(allFixedExpenses.map(e => e.date.substring(0, 7)));
-    const numFixedMonths = Math.max(1, fixedMonths.size);
-    const avgMonthlyFixed = totalFixedAllMonths / numFixedMonths;
-    const fixedTotal = avgMonthlyFixed > 0 ? avgMonthlyFixed : MONTHLY_FIXED_COSTS;
+    // True Run-Rate Fixed Costs (Unit Economics)
+    // We anchor to $2,665/month ($2,065 base insurance + $600 trailer) to prevent
+    // annual down payments ($4,900) or catch-up bills from skewing the monthly break-even metrics.
+    const fixedTotal = MONTHLY_FIXED_COSTS + monthExpenses.filter(e => fixedCats.has(e.category) && e.category !== 'Insurance' && e.category !== 'Trailer').reduce((s, e) => s + e.amount, 0);
+
     const fixedPerMile = monthMiles > 0 ? fixedTotal / monthMiles : 0;
     const allInPerMile = varPerMile + fixedPerMile;
     const marginalPerMile = ratePerMile - varPerMile;
-    // True net = revenue minus ALL costs (actual records + reserves, no double-counting)
-    const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal;
+
+    // True net = revenue minus ALL costs (actual records + reserves + one-offs, no double-counting)
+    const totalTrueCosts = fixedTotal + allVarFromRecords + reservesTotal + oneOffFromRecords;
     const trueNetProfit = monthIncome - totalTrueCosts;
     // Net per mile computed directly from trueNetProfit to guarantee consistency
     const netPerMile = monthMiles > 0 ? trueNetProfit / monthMiles : 0;
