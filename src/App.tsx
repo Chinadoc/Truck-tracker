@@ -993,7 +993,7 @@ function App() {
       reservesPerMile, reservesTotal, varPerMile, varTotal,
       fixedTotal, fixedPerMile, allInPerMile, marginalPerMile, netPerMile, otherVarPerMile,
       totalTrueCosts, trueNetProfit, companyDriverEq, beating,
-      monthVarExp: allVarFromRecords,
+      monthVarExp: allVarFromRecords, oneOffFromRecords,
     };
   }, [monthIncomes, monthExpenses, monthIncome, monthMiles]);
 
@@ -1403,6 +1403,12 @@ function App() {
                             const otherFixed = monthExpenses.filter(e => FIXED_CATS.has(e.category) && e.category !== 'Insurance' && e.category !== 'Trailer').reduce((s, e) => s + e.amount, 0);
                             return otherFixed > 0 ? <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Food')}:</span> <span>{formatCurrency(otherFixed)}</span></div> : null;
                           })()}
+                          {mc.oneOffFromRecords > 0 && <>
+                            <div style={{ fontWeight: 700, color: '#f97316', marginTop: '0.5rem', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.2rem' }}>One-Off Charges ({formatCurrency(mc.oneOffFromRecords)})</div>
+                            {monthExpenses.filter(e => ['insdown-mar', 'inspmt-feb'].includes(e.id)).map(e => (
+                              <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span style={{ flex: 1 }}>{e.description}:</span> <span>{formatCurrency(e.amount)}</span></div>
+                            ))}
+                          </>}
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dotted rgba(255,255,255,0.1)' }}><span>{bi('Personal Need')}:</span> <span>{formatCurrency(totalPersonalMonthly)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.15rem' }}><span>{bi('Debt Payment')}:</span> <span>{formatCurrency(personalExpenses.find(p => p.category === 'Debt')?.monthlyAmount ?? 0)}</span></div>
                         </div>
