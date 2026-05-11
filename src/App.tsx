@@ -930,7 +930,6 @@ function App() {
     const dispatchFromRecords = monthExpenses.filter(e => e.category === 'Dispatch').reduce((s, e) => s + e.amount, 0);
     const tollsFromRecords = monthExpenses.filter(e => e.category === 'Tolls').reduce((s, e) => s + e.amount, 0);
     const deadheadFromRecords = monthExpenses.filter(e => e.category === 'Deadhead').reduce((s, e) => s + e.amount, 0);
-    const fixedFromRecords = monthExpenses.filter(e => fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
     const allVarFromRecords = monthExpenses.filter(e => !fixedCats.has(e.category)).reduce((s, e) => s + e.amount, 0);
 
     // Per-mile from actuals
@@ -942,20 +941,28 @@ function App() {
     const tollsPerMile = monthMiles > 0 ? tollsFromRecords / monthMiles : 0;
     const tollsTotal = tollsFromRecords;
 
-    // Hidden reserves (not in expense records — these are long-term cost allocations)
+    // Hidden reserves (not in expense records — long-term cost allocations)
     const deprPerMile = CASCADIA_DEPR_RATE;
     const maintPerMile = CASCADIA_MAINT_RESERVE;
     const reservesPerMile = deprPerMile + maintPerMile;
     const reservesTotal = monthMiles * reservesPerMile;
 
-    // Other variable expenses (Permits, Other, Maintenance, etc. — not in named categories above)
+    // Other variable expenses (Permits, Other, Maintenance — not in named categories above)
     const otherVarFromRecords = allVarFromRecords - fuelFromRecords - dispatchFromRecords - tollsFromRecords - deadheadFromRecords;
     const otherVarPerMile = monthMiles > 0 ? otherVarFromRecords / monthMiles : 0;
 
-    // Aggregate per-mile — includes ALL variable costs so per-mile × miles = dollar total
+    // Aggregate per-mile
     const varPerMile = fuelPerMile + dispatchPerMile + deadheadPerMile + tollsPerMile + deprPerMile + maintPerMile + otherVarPerMile;
     const varTotal = allVarFromRecords + reservesTotal;
-    const fixedTotal = fixedFromRecords > 0 ? fixedFromRecords : MONTHLY_FIXED_COSTS;
+
+    // Fixed costs: average ALL fixed expenses across all months for a smooth monthly rate
+    // This prevents lumpy payments (e.g. $4,900 insurance down payment) from distorting any single month
+    const allFixedExpenses = expenses.filter(e => fixedCats.has(e.category));
+    const totalFixedAllMonths = allFixedExpenses.reduce((s, e) => s + e.amount, 0);
+    const fixedMonths = new Set(allFixedExpenses.map(e => e.date.substring(0, 7)));
+    const numFixedMonths = Math.max(1, fixedMonths.size);
+    const avgMonthlyFixed = totalFixedAllMonths / numFixedMonths;
+    const fixedTotal = avgMonthlyFixed > 0 ? avgMonthlyFixed : MONTHLY_FIXED_COSTS;
     const fixedPerMile = monthMiles > 0 ? fixedTotal / monthMiles : 0;
     const allInPerMile = varPerMile + fixedPerMile;
     const marginalPerMile = ratePerMile - varPerMile;
