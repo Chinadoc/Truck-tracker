@@ -816,6 +816,7 @@ function App() {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
   const [showBreakEvenDetails, setShowBreakEvenDetails] = useState(false);
+  const [expandedReportMonth, setExpandedReportMonth] = useState<string | null>(null);
 
   // === MONTH CYCLE SELECTOR ===
   const currentYM = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -2326,17 +2327,45 @@ function App() {
                         const mTax = mTaxCalc.totalTax;
                         const mNet = mProfit - mTax;
                         return (
-                          <tr key={month}>
-                            <td style={{ fontWeight: 700 }}>{(() => { const [y, m] = month.split('-'); return new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' }); })()}</td>
-                            <td>{mInc.length}</td>
-                            <td>{mMiles.toLocaleString()}</td>
-                            <td className="text-success">{formatCurrency(mRevenue)}</td>
-                            <td className="text-danger">{formatCurrency(mFuel)}</td>
-                            <td className="text-danger">{formatCurrency(mOther)}</td>
-                            <td className="text-danger">{formatCurrency(mHidden)}</td>
-                            <td className="text-danger">{formatCurrency(mTax)}</td>
-                            <td style={{ fontWeight: 800, color: mNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mNet)}</td>
-                          </tr>
+                          <>
+                            <tr key={month} onClick={() => setExpandedReportMonth(expandedReportMonth === month ? null : month)} style={{ cursor: 'pointer', transition: 'background 0.15s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                              <td style={{ fontWeight: 700 }}>
+                                {expandedReportMonth === month ? <ChevronUp size={12} style={{ display: 'inline', marginRight: '0.25rem' }} /> : <ChevronDown size={12} style={{ display: 'inline', marginRight: '0.25rem' }} />}
+                                {(() => { const [y, m] = month.split('-'); return new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' }); })()}
+                              </td>
+                              <td>{mInc.length}</td>
+                              <td>{mMiles.toLocaleString()}</td>
+                              <td className="text-success">{formatCurrency(mRevenue)}</td>
+                              <td className="text-danger">{formatCurrency(mFuel)}</td>
+                              <td className="text-danger">{formatCurrency(mOther)}</td>
+                              <td className="text-danger">{formatCurrency(mHidden)}</td>
+                              <td className="text-danger">{formatCurrency(mTax)}</td>
+                              <td style={{ fontWeight: 800, color: mNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(mNet)}</td>
+                            </tr>
+                            {expandedReportMonth === month && (
+                              <tr>
+                                <td colSpan={9} style={{ padding: 0, background: 'rgba(0,0,0,0.15)' }}>
+                                  <div style={{ overflow: 'hidden', animation: 'fadeIn 0.2s ease-out', padding: '0.5rem 1rem' }}>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>Other Expenses Breakdown — {(() => { const [y, m] = month.split('-'); return new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }); })()}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem 2rem', fontSize: '0.65rem' }}>
+                                      {mExp.filter(e => e.category !== 'Fuel' && e.category !== 'Deadhead').map(e => (
+                                        <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.15rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                          <span style={{ color: 'var(--text-secondary)' }}>
+                                            <span style={{ display: 'inline-block', padding: '0.1rem 0.3rem', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 600, background: 'rgba(255,255,255,0.06)', marginRight: '0.3rem' }}>{e.category}</span>
+                                            {e.description}
+                                          </span>
+                                          <span className="text-danger" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatCurrency(e.amount)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem', paddingTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', fontWeight: 700 }}>
+                                      <span className="text-danger">Total: {formatCurrency(mOther)}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         );
                       })}
                     </tbody>
